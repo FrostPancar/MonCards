@@ -1,4 +1,4 @@
-# MonCards — Game Rules (Draft v0.1)
+# MonCards — Game Rules (Draft v0.2)
 
 > Working draft. Sections marked **🔶 Open question** are gaps or ambiguities in the
 > current design that need a decision before the rules are final.
@@ -24,14 +24,26 @@ You win by reducing your opponent's **Life Points (LP)** from **6000** to **0**.
 | Side Deck      | 15 cards      | 4                   | Swapped with the Main Deck before the duel     |
 | Extra Deck     | 10 cards      | 2                   | Extra Deck monsters only                       |
 | Field Deck     | 4 cards       | 1                   | Field cards only                               |
-| Barrier cards  | 4 cards       | —                   | See §6.5 for Barrier-specific limits           |
+| Barrier cards  | 4 cards       | 4                   | Duplicates allowed (e.g. 4× *Cocoon*); see §6.6 |
 | Boss Monster   | 1 card        | —                   |                                               |
 
-- Some cards override the copy limit in their own text (e.g. *Insect Remains*: "you can
+- Some cards override the copy limit in their own text (e.g. *Insect Shell*: "you can
   have more than 2 of this card in your Extra Deck").
 - 🔶 **Open question:** does the 4-copy limit count Main + Side combined (Yu-Gi-Oh! style)
   or each pile separately? *The index app currently validates Main + Side combined.*
-- 🔶 **Open question:** can a deck run duplicate Barrier cards, or are they 1 copy each?
+- Neither sample deck has a Side Deck yet; the index flags this as a warning, not an error.
+
+### Card backs
+
+Every pile has its own card back, so you can always tell where a face-down card came from:
+
+| Back       | Used by                                   |
+|------------|-------------------------------------------|
+| Main       | Main Deck cards (hand, Deck, set Actions) |
+| Extra      | Extra Deck                                |
+| Boss       | Boss Monster                              |
+| Field      | Field cards (e.g. while face-down)        |
+| Barrier    | Barriers (a destroyed Barrier shows this) |
 
 ---
 
@@ -94,14 +106,14 @@ through effects that can be used in the Battle Phase.
 
 Every card has a **frame color** that tells you its type at a glance.
 
-| Type             | Frame   | Lives in        | Has Charge | Has Charge Cost | Footprint |
+| Card type        | Frame   | Lives in        | Has Charge | Has Charge Cost | Footprint |
 |------------------|---------|-----------------|------------|-----------------|-----------|
-| Basic Monster    | Slate   | Main Deck       | ✅          | —               | 1         |
+| Basic Monster    | Bone    | Main Deck       | ✅          | —               | 1         |
 | Tribute Monster  | Crimson | Main Deck       | ✅ (opt.)   | ✅ 5–30          | ✅         |
 | Extra Deck Mon.  | Teal    | Extra Deck      | ❌          | special          | ✅         |
 | Action           | Amber   | Main Deck       | ✅          | ✅               | —         |
 | Field            | Green   | Field Deck      | —          | —               | —         |
-| Barrier          | Steel   | Barrier Zones   | —          | —               | —         |
+| Barrier          | Blue    | Barrier Zones   | —          | —               | —         |
 | Boss Monster     | Violet  | Boss Zone       | (opt.)     | special          | ✅         |
 
 ### Shared monster anatomy
@@ -109,8 +121,9 @@ Every card has a **frame color** that tells you its type at a glance.
 - **Name**
 - **ATK / DEF** — there are no battle positions. A monster uses **ATK when attacking**
   and **DEF when being attacked**.
-- **Type** — at most one (e.g. *Earth*). A card may have no Type.
-- **Tags** — any number (e.g. *Insect*, *Fungus*, *Undead*).
+- **Tags** — any number (e.g. *Insect*, *Ant*, *Fungus*, *Undead*). There are **no Types**;
+  tags are the only creature classification, and each tag has a pixel icon.
+- **Keywords** — rules shorthand shown next to tags (see §8 for *Blocker* / *Unblockable*).
 - **Charge** — a number used to pay Charge Costs (see §7).
 - **Effect text** (optional).
 
@@ -150,7 +163,7 @@ Every card has a **frame color** that tells you its type at a glance.
   - **Fusion style** — summoned by an Action card that requires semi-specific monsters
     (think *Absolute Zero* / *Mask Change*).
   - **Formation style** (Synchro/Xyz replacement) — **flip face-down** a number of your
-    monsters with the required Type/Tag **equal to the Footprint size** of the Extra Deck
+    monsters with the required Tag **equal to the Footprint size** of the Extra Deck
     monster.
 - 🔶 **Open question:** for Formation style, does the Extra Deck monster sit on top of the
   flipped-down materials (covering exactly those zones), and what happens to the
@@ -189,7 +202,7 @@ Barrier archetypes:
 
 | Archetype            | Effect pattern                                                              |
 |----------------------|------------------------------------------------------------------------------|
-| **Basic Protector**  | While face-up, take **100** less damage when your Basic/Extra Deck monsters are destroyed in battle (**200** less for Type-specific, **300** less for Tag-specific versions). **Max 1 Basic Protector per deck.** |
+| **Basic Protector**  | While face-up, take **100** less damage when your Basic/Extra Deck monsters are destroyed in battle (**300** less for Tag-specific versions). **Max 1 Basic Protector per deck.** |
 | **Advanced Protector** | Reduce damage taken when a Tribute/Boss monster is destroyed in battle to **800 / 600 / 500** |
 | **Charge Support**   | Flip face-down to gain bonus Charge when Tribute Summoning or playing an Action card |
 | **On-Destroy**       | When destroyed: draw, stun another attacker, deal/heal LP, tribute a monster to destroy a monster, add itself to hand as an unusable high-Charge Action card to pay other costs, … |
@@ -234,6 +247,10 @@ An attacker can target:
 
 Attacks can be **redirected** by **Blocker** monsters/Barriers or by Action card effects.
 
+- **Blocker:** when an opponent's monster attacks, the Blocker's controller can redirect the
+  attack to the Blocker.
+- **Unblockable** ("can't be blocked"): Blockers can't redirect this monster's attacks.
+
 ### Resolving an attack on a monster
 
 Compare the attacker's **ATK** with the target's **DEF**:
@@ -260,61 +277,140 @@ of the destroyed monster** loses:
 
 ---
 
-## 9. Sample Cards & Anatomy
+## 9. Card Anatomy
 
 Card anatomy, top to bottom (the app renders cards this way):
 
 ```
 ┌──────────────────────────────┐
-│ NAME                    ◆ 3  │  ← Charge (diamond) / Charge Cost on Tribute & Action
-│ Tribute · Earth              │  ← card type · Type
+│ NAME                    ◆ 3  │  ← Charge
+│ TRIBUTE              COST 7  │  ← card type · Charge Cost (Tribute)
 │ ┌──────────────────────────┐ │
 │ │        pixel art         │ │
 │ └──────────────────────────┘ │
-│ [Insect] [Undead]   ▣▣ FP 2  │  ← Tags · Footprint
+│ [🐜 Insect] [🛡 Blocker] ▣▣  │  ← Tags (with icons) · Keywords · Footprint
 │ Effect text…                 │
-│ ⚔ 2200        ⛨ 1500         │  ← ATK / DEF
+│ ⚔ 2200            ⛨ 1500     │  ← ATK / DEF   (Actions: COST n · SET +n)
 └──────────────────────────────┘
 ```
 
-### Insect Remains *(Extra Deck Monster — shared by both Insect decks)*
+The frame color shows the card type (§6). Every card has a white rim and black outline,
+like a physical card.
 
-- **ATK 100 / DEF 100**, Charge — (Extra Deck: none), Footprint 1
-- Tags: **Insect** · Type: none
-- You can summon 1 *Insect Remains* when one of your Insect monsters (except *Insect
-  Remains*) is tributed or destroyed.
+---
+
+## 10. Decklists
+
+Working titles (names not decided yet) are marked *†*. 🔶 Footprints for Tribute monsters
+weren't specified: the app uses 1, except *Big Bad* and *Emperor* (2). Some tags are
+guesses (marked *‡*).
+
+### Shared cards
+
+**Insect Shell** *(Extra Deck)* — 100/100, Footprint 1, Tags: Insect
+- You can summon 1 *Insect Shell* when one of your Insect monsters (except *Insect Shell*)
+  is tributed or destroyed.
 - Cannot attack. You don't lose LP when this card is destroyed in battle.
-- **Special rule:** you can have more than 2 copies of this card in your Extra Deck.
+- You can have more than 2 copies of this card in your Extra Deck.
 
-Both Insect decks run **10× Insect Remains** as their entire Extra Deck.
+Both decks run **10× Insect Shell** as their entire Extra Deck. *(Renamed from
+"Insect Remains" to match the newer card text.)*
 
-### Hive Queen *(Boss — Insect deck A)*
+**Lamp** *(Field)* — Once per turn: reveal the top 5 cards of your Deck and play 1 Basic
+Insect among them.
 
-- **ATK 3000 / DEF 3000**, Footprint **3**, Tags: **Insect**
+**Mantis** *(Tribute, both decks)* — 3000/1500, Cost 7, Charge 0. Once per turn: after
+this card destroys a Barrier or monster, it can attack again.
+
+### Hive Queen deck
+
+**Boss — Hive Queen** — 3000/3000, Footprint 3, Tags: Insect
 - When your Insects are sent from the field to the GY, put them under this card instead.
-- At the start of your turn, you can swap an *Insect Remains* on the field with a Basic
+- At the start of your turn, you can swap an *Insect Shell* on the field with a Basic
   Insect under this card.
 - When this card has at least 15 cards under it, you can shuffle all of them into your
   Deck / Extra Deck to summon this card.
 - When this card is summoned, summon any number of Basic Insects from your Deck.
 - When this card would be destroyed, you can tribute another Insect instead.
 
-### Brain-Eating Fungus *(Boss — Insect deck B)*
+**Barriers:** 4× **Cocoon** — When destroyed: summon 1 *Insect Shell*.
 
-- **ATK 100 / DEF 100**, Tags: **Fungus, Undead** · Type: **Earth**
-- Once per turn, you can **infect** an Insect on your field (it gains the *Infected* tag);
-  it gains Charge equal to the number of Infected Insects on your field.
-- If an Infected Insect dies, the infection moves to an *Insect Remains*.
+**Field Deck:** Lamp · Royal Nursery† (once per turn, when an Insect is summoned: add an
+Insect to hand) · Brood Chamber† (when an Insect is destroyed: add an Insect to hand; not
+once per turn) · Offering Pit† (destroy an Insect: draw 2)
+
+| # | Card | Kind | ATK/DEF | Charge | Cost | Text |
+|---|------|------|---------|--------|------|------|
+| 4 | Beatstick Bug | Basic | 1500/1500 | 0 | — | — |
+| 4 | Beetle Defender | Basic | 1000/1500 | 1 | — | Blocker |
+| 4 | Larva | Basic | 100/100 | 3 | — | +2 Charge when tributed for an Insect monster |
+| 4 | Dung Beetle | Basic | 1200/1000 | 2 | — | Insect Shells on your field get +2 Charge |
+| 4 | Silkworm | Basic | 500/500 | 2 | — | +2 Charge when paying for an Insect Action or tributed for an Insect monster |
+| 3 | Mantis | Tribute | 3000/1500 | 0 | 7 | See shared cards |
+| 3 | Moth | Tribute | 1500/1500 | 3 | 5 | When summoned: play an Insect Action without paying its cost |
+| 3 | Wasp | Tribute | 2000/1000 | 3 | 6 | Tribute this to destroy an opponent's monster |
+| 3 | Cicada | Tribute | 2000/2500 | 3 | 7 | Insect Shells gain +2 Charge; draw 2 when an Insect is Tribute Summoned |
+| 4 | Forage† | Action | — | 2 | 0 (set ?) | Add an Insect from Deck to hand |
+| 4 | Molt† | Action | — | 2 | 0 (set +2) | Tribute an Insect: draw 2 |
+| 4 | Paralytic Sting† | Action | — | 2 | 2 (set +4) | Tribute an Insect: negate a monster's effects |
+| 3 | Swarm Frenzy† | Action | — | 2 | 2 (set +2) | Your Insects gain 1000 ATK this turn |
+| 3 | Chew Through† | Action | — | 2 | 0 (set ?) | Tribute an Insect: destroy an Action card, or pay +2 to flip the opponent's Field card face-down until end of turn |
+
+20 Basic + 12 Tribute + 18 Action = **50**. Queen Actions are tagged *Insect* (so Moth and
+Silkworm can use them).
+
+### Brain-Eating Fungus deck
+
+**Boss — Brain-Eating Fungus** — 100/100, Tags: Fungus, Undead (Footprint assumed 1)
+- Once per turn, you can **infect** an Insect on your field (it becomes *Infected*); it
+  gains Charge equal to the number of Infected Insects on your field.
+- If an Infected Insect dies, the infection moves to an *Insect Shell*.
 - Opponent's monsters that battle your Infected monsters also become Infected and lose
   100 ATK for each Infected card on the field.
 - You can summon this card by tributing 4 Infected monsters on **either** field.
 - While this card is on your field, all your Insects are Infected.
 - Gains 400 ATK/DEF for every Infected card on the field.
-- 🔶 *Footprint not specified — assumed 1.*
+
+**Barriers:** 4× **Moldy Shield** — When destroyed: Infect the attacking monster.
+
+**Field Deck:** Lamp · Ant Trail† (shuffle an Ant from hand into Deck: draw 2) ·
+Spore Vent† (tribute an Infected Ant: Infect an opponent's monster) · Rotting Grove†
+(Infected non-Ant monsters lose an extra 100 ATK for each Infected monster on the field)
+
+| # | Card | Kind | ATK/DEF | Charge | Cost | Text |
+|---|------|------|---------|--------|------|------|
+| 4 | Door Head Ant | Basic | 800/1000 | 2 | — | Blocker |
+| 4 | Soldier Ant | Basic | 1200/1200 | 0 | — | Blocker |
+| 4 | Worker Ant | Basic | 500/500 | 2 | — | When summoned: draw 1 |
+| 4 | Ant Larva | Basic | 100/100 | 3 | — | When summoned: add an Ant from Deck to hand |
+| 4 | Fire Ant | Basic | 500/500 | 1 | — | Tribute this and target an opponent's monster: it can't be tributed or attack until end of opponent's turn. Can target Infected monsters during the opponent's turn |
+| 4 | Flying Ant | Basic | 1200/500 | 0 | — | Can't be blocked |
+| 2 | Big Bad ‡ | Tribute | 3000/2500 | 4 | 12 | Once per turn: destroy a monster and an Action card |
+| 2 | Mantis | Tribute | 3000/1500 | 0 | 7 | See shared cards |
+| 4 | Stalls BFF ‡ | Tribute | 2000/2500 | 2 | 8 | Once per turn: tribute a monster to flip one of your Barriers face-up, then you can destroy a Basic monster |
+| 2 | Emperor ‡ | Tribute | 3200/2500 | 4 | 18 | When summoned: opponent can't use Action cards until end of their turn, and negate all their non-Boss monster effects until end of your turn |
+| 4 | Spore Cloud† | Action | — | 2 | 0 (set +2) | Infect a monster on the field |
+| 4 | Rot† | Action | — | 2 | 2 (set +2) | Destroy an Infected monster |
+| 2 | Hivemind Veto† | Action | — | 0 | 4 (set ?) | Tribute an Infected monster: negate an Action activation |
+| 2 | Puppet Strings† | Action | — | 0 | 4 (set ?) | When the opponent attacks: change the target to an Infected monster |
+| 2 | Fungal Mending† | Action | — | 2 | 4 (set ?) | When your monster would be destroyed: it is not destroyed |
+| 2 | Total Bloom† | Action | — | 2 | 20 (set ?) | Destroy all cards your opponent controls on the field |
+
+24 Basic + 10 Tribute + 16 Action = **50**. Ants are tagged *Insect* + *Ant*; Fungus Actions
+are tagged *Fungus*.
+
+🔶 **Open questions for these decks**
+- "set ?" — the extra cost for using these Actions on the opponent's turn wasn't given.
+  Several are reactive (Veto, Puppet Strings, Mending): is their set cost 0?
+- Tribute monster footprints (see above).
+- ‡ Tags for Big Bad, Stalls BFF and Emperor are guesses.
+- Do Insect Shells count as "Insect" for Larva/Silkworm bonuses? (Yes in the app.)
+- Can a Tribute Summon use Insect Shells as tributes? They're Extra Deck monsters, not
+  Basics, so the app says no, but Dung Beetle/Cicada giving them Charge suggests yes.
 
 ---
 
-## 10. Glossary
+## 11. Glossary
 
 | Term          | Meaning                                                              |
 |---------------|----------------------------------------------------------------------|
@@ -323,5 +419,6 @@ Both Insect decks run **10× Insect Remains** as their entire Extra Deck.
 | Footprint     | Number of adjacent Monster Zones a monster occupies                  |
 | Tribute       | Send a monster from your field to the GY as part of a cost            |
 | Flip down     | Turn a card face-down (destroyed Barrier, Formation material, Field)  |
-| Infected      | A status/tag applied by Fungus effects                                |
+| Infected      | A status applied by Fungus effects (shown with a spore icon)          |
 | Blocker       | A card that can redirect an attack to itself                          |
+| Unblockable   | A monster whose attacks Blockers can't redirect                       |

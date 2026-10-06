@@ -4,7 +4,7 @@
   const state = { q: '', kind: 'all', deck: 'all', tag: 'all' };
   let root;
 
-  const allTags = [...new Set(MC.CARDS.flatMap(c => c.tags || []))].sort();
+  const allTags = [...new Set(MC.CARDS.flatMap(c => [...(c.tags || []), ...(c.keywords || [])]))].sort();
 
   function deckSections(deck) {
     return [
@@ -19,9 +19,9 @@
 
   function matches(card) {
     if (state.kind !== 'all' && card.kind !== state.kind) return false;
-    if (state.tag !== 'all' && !(card.tags || []).includes(state.tag) && card.type !== state.tag) return false;
+    if (state.tag !== 'all' && ![...(card.tags || []), ...(card.keywords || [])].includes(state.tag)) return false;
     if (state.q) {
-      const hay = [card.name, card.text, card.type, card.archetype, ...(card.tags || [])].join(' ').toLowerCase();
+      const hay = [card.name, card.text, card.archetype, ...(card.tags || []), ...(card.keywords || [])].join(' ').toLowerCase();
       if (!hay.includes(state.q.toLowerCase())) return false;
     }
     return true;
@@ -40,27 +40,30 @@
       const cards = MC.CARDS.filter(matches)
         .sort((a, b) => MC.KIND_ORDER.indexOf(a.kind) - MC.KIND_ORDER.indexOf(b.kind) || a.name.localeCompare(b.name));
       out.innerHTML = `<p class="result-count">${cards.length} card${cards.length === 1 ? '' : 's'}</p>
-        <div class="card-grid">${cards.map(c => cell(c)).join('') || '<p class="empty">No cards match.</p>'}</div>`;
+        <div class="card-grid">${cards.map(c => cell(c)).join('') || '<p class="empty">No cards match.</p>'}</div>
+        <h3 class="sec-title">Card backs</h3>
+        <div class="backs-row">${[['main', 'Main Deck'], ['extra', 'Extra Deck'], ['boss', 'Boss'], ['field', 'Field'], ['barrier', 'Barrier']]
+          .map(([b, l]) => `<figure>${MC.renderBack(b, 'card')}<figcaption>${l}</figcaption></figure>`).join('')}</div>`;
       return;
     }
     const deck = MC.DECKS[state.deck];
-    const issues = MC.validateDeck(deck);
+    const { errors, warnings } = MC.validateDeck(deck);
     const sections = deckSections(deck).map(([title, list]) => {
       const shown = list.filter(([id]) => matches(MC.byId[id]));
       if (!shown.length) return '';
       return `<h3 class="sec-title">${title} <small>${MC.count(list)}</small></h3>
         <div class="card-grid">${shown.map(([id, n]) => cell(MC.byId[id], n)).join('')}</div>`;
     }).join('');
-    out.innerHTML = `<div class="deck-summary panel">
+    out.innerHTML = `<div class="deck-summary box">
         <div><span class="eyebrow">Deck</span><h2>${MC.esc(deck.name)}</h2></div>
         <ul class="deck-stats">
           <li><b>${MC.count(deck.main)}</b>Main</li><li><b>${MC.count(deck.side)}</b>Side</li>
           <li><b>${MC.count(deck.extra)}</b>Extra</li><li><b>${deck.field.length}</b>Field</li>
           <li><b>${deck.barriers.length}</b>Barrier</li><li><b>1</b>Boss</li>
         </ul>
-        <div class="legal ${issues.length ? 'bad' : 'ok'}">${issues.length
-          ? '✕ ' + issues.map(MC.esc).join('<br>✕ ')
-          : '✓ Deck is legal'}</div>
+        <div class="legal ${errors.length ? 'bad' : warnings.length ? 'warn' : 'ok'}">${errors.length
+          ? '✕ ' + errors.map(MC.esc).join('<br>✕ ')
+          : '✓ Deck is legal'}${warnings.map(w => `<br>! ${MC.esc(w)} — not filled yet`).join('')}</div>
       </div>${sections || '<p class="empty">No cards match.</p>'}`;
   }
 
@@ -75,12 +78,12 @@
     }).join('');
     const rows = [
       ['Kind', MC.KINDS[c.kind].long],
-      c.type !== undefined && MC.isMonster(c) ? ['Type', c.type || '—'] : null,
       c.tags?.length ? ['Tags', c.tags.join(', ')] : null,
+      c.keywords?.length ? ['Keywords', c.keywords.join(', ')] : null,
       MC.isMonster(c) ? ['ATK / DEF', `${c.atk} / ${c.def}`] : null,
       c.charge != null ? ['Charge', c.charge] : null,
       c.cost != null ? ['Charge Cost', c.cost] : null,
-      c.setCost != null ? ['Set cost (opp. turn)', '+' + c.setCost] : null,
+      c.kind === 'action' ? ['Set cost (opp. turn)', c.setCost == null ? 'not decided' : '+' + c.setCost] : null,
       MC.isMonster(c) && c.kind !== 'basic' ? ['Footprint', c.footprint || 1] : null,
       c.archetype ? ['Archetype', c.archetype] : null,
       c.limit === Infinity ? ['Copy limit', 'Unlimited'] : null,
@@ -92,7 +95,6 @@
         <h2>${MC.esc(c.name)}</h2>
         <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${MC.esc(v)}</dd>`).join('')}</dl>
         ${inDecks ? `<h4>In decks</h4><ul class="in-decks">${inDecks}</ul>` : ''}
-        ${c.sample ? '<p class="note">Placeholder card — stats and text are stand-ins for the mockup.</p>' : ''}
       </div></div>`, { wide: true });
   }
 
@@ -112,7 +114,7 @@
           ${Object.entries(MC.DECKS).map(([k, d]) => `<option value="${k}" ${state.deck === k ? 'selected' : ''}>${MC.esc(d.name)}</option>`).join('')}
         </select></label>
         <label>Tag <select data-sel="tag">
-          <option value="all">Any</option>
+          <option value="all">Any tag</option>
           ${allTags.map(t => `<option ${state.tag === t ? 'selected' : ''}>${MC.esc(t)}</option>`).join('')}
         </select></label>
       </div>`;
@@ -126,7 +128,7 @@
           <h1>Card Index</h1>
           <p class="lede">Every card in the pool. Pick a deck to see its list and legality check.</p>
         </div>
-        <div class="filters panel"></div>
+        <div class="filters box"></div>
         <div class="index-body"></div>
       </div>`;
       renderFilters(); renderGrid();

@@ -13,7 +13,7 @@ python3 -m http.server 8000   # then visit http://localhost:8000
 Two views:
 
 - **Card Index** (`#index`): browse every card, filter by kind, tag or search, and pick a deck to see its list and legality check.
-- **Play Table** (`#table`): a hot-seat mockup duel on a 3D pixel table. It enforces zones, footprint, charge costs, battle damage and turn-1 rules. You apply card effects by hand with the inspector controls. It opens on a demo board; use **New duel** for the full setup flow (deck pick → field selection → draw 7).
+- **Play Table** (`#table`): a hot-seat mockup duel on a 3D pixel table. Drag cards (hand → zones, field → other zones / GY / hand / deck) or click them. It enforces zones, footprint, charge costs (including conditional Charge bonuses), Blockers, Barrier triggers, battle damage and turn-1 rules. Other card effects you apply by hand from the dialog box. A mosaic **pixel filter** (Off / 2x / 3x) sits over the whole view. It opens on a demo board; use **New duel** for the full setup flow (deck pick → field selection → draw 7).
 
 ## Layout
 
@@ -26,5 +26,6 @@ Two views:
 | `src/main.js` | Router, modal, toast |
 | `style.css` | All styling |
 
-Cards flagged `sample: true` are placeholders that fill out the two Insect decks.
-Art is generated procedurally from each card's id until real sprites exist.
+The two Insect decks (Hive Queen, Brain-Eating Fungus) are the real lists; names marked
+*working title* in `data/cards.js` still need naming. Art is generated procedurally from each
+card's id (one-colour silhouettes) until real sprites exist.
