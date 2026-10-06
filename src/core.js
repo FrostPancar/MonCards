@@ -7,6 +7,9 @@
 
   MC.byId = Object.fromEntries(MC.CARDS.map(c => [c.id, c]));
 
+  /** Monster art is hidden for now; flip to true to bring the procedural sprites back. */
+  MC.SHOW_ART = false;
+
   // GBC-style palette: bright card bodies, pale art backdrops.
   MC.KINDS = {
     basic:   { label: 'Basic',   long: 'Basic Monster',      frame: '#f2c84b', pale: '#fff4cf', back: 'main' },
@@ -30,6 +33,7 @@
     charge: ['...#...', '..###..', '.#####.', '#######', '.#####.', '..###..', '...#...'],
     chargeEmpty: ['...#...', '..#.#..', '.#...#.', '#.....#', '.#...#.', '..#.#..', '...#...'],
     heart:  ['.##.##.', '#######', '#######', '#######', '.#####.', '..###..', '...#...'],
+    foot:   ['.#.#.#...', '.#.#.#.#.', '.......#.', '..#####..', '.#######.', '.#######.', '..######.', '...####..', '....##...'],
     // tag icons (9×9)
     Insect: ['.#.....#.', '..#...#..', '...###...', '..#####..', '#.#####.#', '.#######.', '#.#####.#', '.#.###.#.', '...#.#...'],
     Ant:    ['..#...#..', '...#.#...', '...###...', '....#....', '#..###..#', '.#######.', '..#####..', '.#######.', '#..###..#'],
@@ -60,8 +64,12 @@
   };
 
   MC.TAG_COLORS = { Insect: '#3aa63a', Ant: '#e2582a', Fungus: '#d03aa8', Undead: '#7a6c94', Infected: '#d03aa8' };
+  /** Tag chip: icon only, the name slides out on hover. */
   MC.tagChip = t =>
-    `<span class="tag" style="--tc:${MC.TAG_COLORS[t] || '#555'}">${MC.icon(t)}${MC.esc(t)}</span>`;
+    `<span class="tag" title="${MC.esc(t)}" style="--tc:${MC.TAG_COLORS[t] || '#555'}">${MC.icon(t)}<span class="tag-name">${MC.esc(t)}</span></span>`;
+
+  MC.footChip = n =>
+    `<span class="tag tag-fp" title="Footprint ${n}: blocks ${n - 1} neighbouring zone${n > 2 ? 's' : ''}">${MC.icon('foot')}<b>${n}</b></span>`;
 
   // Keywords that open an effect line ("SUMMON:" style in the reference UI).
   const KEYWORDS = ['Once per turn', 'On Summon', 'On Destroy', 'On Tribute', 'Blocker', 'Unblockable', 'Summon'];
@@ -70,7 +78,8 @@
     const m = line.match(KW_RE);
     if (!m) return MC.esc(line);
     const rest = line.slice(m[0].length);
-    return `<b class="kw">${MC.esc(m[1])}${m[2] === ':' ? ':' : ''}</b>${rest ? ' ' + MC.esc(rest) : ''}`;
+    const slug = m[1].toLowerCase().replace(/\s+/g, '-');
+    return `<b class="kw kw-${slug}">${MC.esc(m[1])}</b>${rest ? ' ' + MC.esc(rest) : ''}`;
   };
   MC.formatText = text =>
     (text || '').split('\n').filter(Boolean).map(l => `<p>${MC.formatLine(l)}</p>`).join('')
@@ -199,6 +208,46 @@
     }
   }
 
+  /**
+   * Ordered-dither gradient as a tiny PNG (Bayer 4×4). Vertical by default;
+   * shown at 2× with image-rendering: pixelated so the dots stay square.
+   */
+  MC.dither = function (c1, c2, len, horizontal) {
+    const cv = document.createElement('canvas');
+    cv.width = horizontal ? len : 4; cv.height = horizontal ? 4 : len;
+    const ctx = cv.getContext('2d');
+    for (let i = 0; i < len; i++) for (let j = 0; j < 4; j++) {
+      const x = horizontal ? i : j, y = horizontal ? j : i;
+      ctx.fillStyle = BAYER[y % 4][x % 4] < (i / (len - 1)) * 16 ? c2 : c1;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    return `url(${cv.toDataURL()})`;
+  };
+
+  const KW_COLORS = {
+    'once-per-turn': ['#5a7cf0', '#9a5ee6'], 'on-summon': ['#2fa84a', '#26b8a6'],
+    'on-destroy': ['#e8384c', '#f08a2a'], 'on-tribute': ['#e0a81e', '#f08a2a'],
+    'summon': ['#8a4ad8', '#e04cb8'], 'blocker': ['#2f6be0', '#26b8a6'], 'unblockable': ['#f08a2a', '#e0b81e'],
+  };
+  (function injectDitherCSS() {
+    const css = [];
+    for (const [kind, k] of Object.entries(MC.KINDS)) {
+      css.push(`.k-${kind}{--d-body:${MC.dither(k.frame, shade(k.frame, .78), 40)};--d-art:${MC.dither(k.pale, shade(k.frame, 1.12), 30)};--edge:${shade(k.frame, .62)}}`);
+    }
+    for (const [slug, [a, b]] of Object.entries(KW_COLORS)) {
+      css.push(`.kw-${slug}{--d-kw:${MC.dither(a, b, 40, true)};--kw2:${b}}`);
+    }
+    css.push(`:root{--d-atk:${MC.dither('#ffffff', '#ffc4cc', 10)};--d-def:${MC.dither('#ffffff', '#c4d6ff', 10)};--d-set:${MC.dither('#ffffff', '#ffe0b8', 10)}}`);
+    document.head.insertAdjacentHTML('beforeend', `<style id="mc-dither">${css.join('')}</style>`);
+  })();
+
+  /** Art window content: the sprite, or (while art is hidden) a dithered panel with a faint tag icon. */
+  MC.artHTML = function (card) {
+    if (MC.SHOW_ART || !MC.isMonster(card)) return `<img src="${MC.art(card)}" alt="">`;
+    const t = (card.tags || [])[card.tags?.includes('Ant') ? card.tags.indexOf('Ant') : 0];
+    return `<span class="art-ph">${t ? MC.icon(t) : ''}</span>`;
+  };
+
   const artCache = {};
   MC.art = function (card) {
     if (artCache[card.id]) return artCache[card.id];
@@ -257,25 +306,22 @@
     `<div class="card-back back-${back} ${cls}" ${attrs}><span class="back-emblem">${MC.icon(back)}</span></div>`;
 
   function footprint(card) {
-    if (!MC.isMonster(card) || card.kind === 'basic') return '';
     const n = card.footprint || 1;
-    return `<span class="c-fp" title="Footprint ${n}">${'<i></i>'.repeat(n)}</span>`;
+    return MC.isMonster(card) && n > 1 ? MC.footChip(n) : '';
   }
+
+  /** ATK and DEF each get their own box. */
+  MC.statBoxes = (atk, def, cls = '') =>
+    `<span class="stat stat-atk ${cls}" title="ATK">${MC.icon('atk')}<b>${atk}</b></span>` +
+    `<span class="stat stat-def ${cls}" title="DEF">${MC.icon('def')}<b>${def}</b></span>`;
+  MC.costBadge = c => c.cost != null ? `<span class="c-cost" title="Charge Cost"><small>COST</small>${c.cost}</span>` : '';
 
   MC.setCostLabel = c => c.setCost == null ? '?' : '+' + c.setCost;
 
   function bottomBar(card) {
-    if (MC.isMonster(card)) {
-      return `<div class="c-stats">
-        <span class="s-atk" title="ATK">${MC.icon('atk')}${card.atk}</span>
-        <span class="s-def" title="DEF">${MC.icon('def')}${card.def}</span>
-      </div>`;
-    }
+    if (MC.isMonster(card)) return `<div class="c-stats">${MC.statBoxes(card.atk, card.def)}</div>`;
     if (card.kind === 'action') {
-      return `<div class="c-stats">
-        <span title="Charge Cost">COST ${card.cost}</span>
-        <span title="Extra cost when set and used on the opponent's turn">SET ${MC.setCostLabel(card)}</span>
-      </div>`;
+      return `<div class="c-stats"><span class="stat stat-set" title="Extra cost when set and used on the opponent's turn">SET <b>${MC.setCostLabel(card)}</b></span></div>`;
     }
     return `<div class="c-stats c-stats-label"><span>${MC.esc(card.archetype || MC.KINDS[card.kind].long)}</span></div>`;
   }
@@ -284,11 +330,10 @@
   MC.renderCard = function (card, opts = {}) {
     if (opts.faceDown) return MC.renderBack(MC.backOf(card), 'card ' + (opts.extraClass || ''));
     const k = MC.KINDS[card.kind];
-    const cost = card.cost != null && card.kind === 'tribute' ? `<span class="c-cost" title="Charge Cost">COST ${card.cost}</span>` : '';
     return `<div class="card k-${card.kind} ${opts.extraClass || ''}" data-card="${card.id}">
-      <div class="c-head"><span class="c-name">${MC.esc(card.name)}</span></div>
-      <div class="c-sub"><span>${k.label}</span>${cost}</div>
-      <div class="c-art"><img src="${MC.art(card)}" alt="">${card.charge != null ? MC.chargePips(card.charge, 'c-charge') : ''}</div>
+      <div class="c-head"><span class="c-name">${MC.esc(card.name)}</span>${MC.costBadge(card)}</div>
+      <div class="c-sub"><span>${k.label}</span></div>
+      <div class="c-art ${MC.SHOW_ART || !MC.isMonster(card) ? '' : 'no-art'}">${MC.artHTML(card)}${card.charge != null ? MC.chargePips(card.charge, 'c-charge') : ''}</div>
       <div class="c-tags">${(card.tags || []).map(MC.tagChip).join('')}${footprint(card)}</div>
       <div class="c-text">${MC.formatText(card.text)}</div>
       ${bottomBar(card)}
@@ -303,10 +348,11 @@
         <span class="back-emblem">${MC.icon(back)}</span>${opts.label ? `<span class="mini-flag">${opts.label}</span>` : ''}</div>`;
     }
     const m = opts.mods || {};
-    const stat = (base, d) => `<b class="${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${base + (d || 0)}</b>`;
+    const cls = d => d > 0 ? 'up' : d < 0 ? 'down' : '';
     const stats = MC.isMonster(card)
-      ? `<div class="m-stats">${stat(card.atk, m.atk)}<i>/</i>${stat(card.def, m.def)}</div>`
-      : card.kind === 'action' ? `<div class="m-stats"><b>C${card.cost}</b></div>`
+      ? `<div class="m-stats">${MC.statBoxes(card.atk + (m.atk || 0), card.def + (m.def || 0))
+          .replace('stat-atk ', `stat-atk ${cls(m.atk)} `).replace('stat-def ', `stat-def ${cls(m.def)} `)}</div>`
+      : card.kind === 'action' ? `<div class="m-stats"><span class="stat stat-set">COST <b>${card.cost}</b></span></div>`
       : `<div class="m-stats m-label">${MC.KINDS[card.kind].label}</div>`;
     const ch = opts.charge ?? card.charge;
     const boosted = opts.charge != null && opts.charge !== card.charge;
@@ -314,7 +360,7 @@
     const tag = (card.tags || [])[card.tags?.includes('Ant') ? card.tags.indexOf('Ant') : 0];
     return `<div class="mini k-${card.kind} ${opts.extraClass || ''}" ${opts.attrs || ''}>
       <div class="m-name">${MC.esc(card.name)}</div>
-      <div class="m-art"><img src="${MC.art(card)}" alt="">${charge}
+      <div class="m-art ${MC.SHOW_ART || !MC.isMonster(card) ? '' : 'no-art'}">${MC.artHTML(card)}${charge}
         ${tag ? `<span class="m-tag" style="--tc:${MC.TAG_COLORS[tag]}">${MC.icon(tag)}</span>` : ''}
         ${opts.infected ? `<span class="m-infected" title="Infected">${MC.icon('Infected')}</span>` : ''}</div>
       ${stats}

@@ -90,11 +90,19 @@
     for (let at = 0; at + n <= MON_ZONES; at++) if (occ.slice(at, at + n).every(v => v === -1)) out.push(at);
     return out;
   }
-  /** Best start for a footprint-n monster dropped on zone i (a start whose span covers i). */
+  /**
+   * Footprint: the card itself sits in one zone and blocks its neighbours.
+   * A footprint-n monster spans [at, at+n); the card shows in the middle zone
+   * (left of middle for even n) and the rest of the span is blocked.
+   */
+  const cardOffset = n => Math.floor((n - 1) / 2);
+  /** Best start for a footprint-n monster dropped on zone i: card lands on i if possible. */
   function startFor(p, n, i, ignoreUid) {
     const starts = freeStarts(p, n, ignoreUid);
-    return starts.find(s => s === i) ?? starts.find(s => s <= i && i < s + n) ?? null;
+    return starts.find(s => s + cardOffset(n) === i) ?? starts.find(s => s <= i && i < s + n) ?? null;
   }
+  /** Zones where the card itself could land. */
+  const cardZones = (p, n, ignoreUid) => new Set(freeStarts(p, n, ignoreUid).map(s => s + cardOffset(n)));
 
   /** Find an instance anywhere on the table. */
   function locate(uid) {
@@ -494,7 +502,7 @@
     const mainKind = ['basic', 'tribute', 'action'].includes(c.kind);
     const h = { pi: d.pi, mon: new Set(), act: new Set(), gy: d.where !== 'boss', deck: mainKind, hand: d.where !== 'hand' && mainKind };
     if (MC.isMonster(c) && (d.where !== 'hand' || ['basic', 'tribute'].includes(c.kind))) {
-      freeStarts(p, fp(c), d.inst.uid).forEach(s => { for (let k = 0; k < fp(c); k++) h.mon.add(s + k); });
+      h.mon = cardZones(p, fp(c), d.inst.uid);
     }
     if (c.kind === 'action' && d.where === 'hand') p.actions.forEach((a, i) => { if (!a) h.act.add(i); });
     return h;
@@ -544,19 +552,25 @@
     const p = P(pi), mirror = pi === 1;
     const m = S.mode;
     const placing = m?.type === 'place' && m.pi === pi;
-    const starts = placing && m.zone === 'mon' ? new Set(freeStarts(p, m.n, m.uid)) : new Set();
+    const starts = placing && m.zone === 'mon' ? cardZones(p, m.n, m.uid) : new Set();
     const hints = dropHints();
     const myHints = hints && hints.pi === pi ? hints : null;
 
-    const col = (at, n) => mirror ? MON_ZONES - (at + n) + 1 : at + 1;
+    const col = i => mirror ? MON_ZONES - i : i + 1;
+    const blocked = new Set();
+    p.monsters.forEach(({ inst, at }) => {
+      const n = fp(inst.card), c = at + cardOffset(n);
+      for (let k = at; k < at + n; k++) if (k !== c) blocked.add(k);
+    });
     let mrow = '';
     for (let i = 0; i < MON_ZONES; i++) {
-      const cls = (starts.has(i) ? 'valid ' : '') + (myHints?.mon.has(i) ? 'drop-ok' : '');
-      mrow += `<div class="zone z-mon ${cls}" style="grid-column:${col(i, 1)}" data-mon="${i}" data-pi="${pi}"><span class="z-label">M${i + 1}</span></div>`;
+      const cls = (starts.has(i) ? 'valid ' : '') + (myHints?.mon.has(i) ? 'drop-ok ' : '') + (blocked.has(i) ? 'blocked' : '');
+      mrow += `<div class="zone z-mon ${cls}" style="grid-column:${col(i)}" data-mon="${i}" data-pi="${pi}">` +
+        (blocked.has(i) ? '<span class="z-block" title="Blocked by a Footprint">🚫</span>' : `<span class="z-label">M${i + 1}</span>`) + '</div>';
     }
     p.monsters.forEach(({ inst, at }) => {
       const n = fp(inst.card);
-      mrow += `<div class="placed fp-${n}" style="grid-column:${col(at, n)} / span ${n}">${miniFor(pi, inst, { where: 'mon' })}</div>`;
+      mrow += `<div class="placed" style="grid-column:${col(at + cardOffset(n))}">${miniFor(pi, inst, { where: 'mon' })}</div>`;
     });
 
     const fieldCell = zone('z-field', `data-fieldzone data-pi="${pi}"`,
@@ -691,17 +705,17 @@
     }
     const c = loc.inst.card, k = MC.KINDS[c.kind];
     const lines = MC.formatText(c.text);
-    const chips = (c.tags || []).map(MC.tagChip).join('');
+    const chips = (c.tags || []).map(MC.tagChip).join('') + (MC.isMonster(c) && fp(c) > 1 ? MC.footChip(fp(c)) : '');
     const live = loc.where === 'mon';
     const stats = MC.isMonster(c)
-      ? `<span class="s-atk">${MC.icon('atk')}${live ? atk(loc.inst) : c.atk}</span><span class="s-def">${MC.icon('def')}${live ? def(loc.inst) : c.def}</span>`
-      : c.kind === 'action' ? `<span>COST ${c.cost}</span><span>SET ${MC.setCostLabel(c)}</span>` : `<span>${MC.esc(c.archetype || k.long)}</span>`;
+      ? MC.statBoxes(live ? atk(loc.inst) : c.atk, live ? def(loc.inst) : c.def)
+      : c.kind === 'action' ? `<span class="stat stat-set">SET <b>${MC.setCostLabel(c)}</b></span>` : `<span class="stat-label">${MC.esc(c.archetype || k.long)}</span>`;
     const ch = c.charge != null || c.id === SHELL ? MC.chargePips(live ? charge(loc.inst, loc.pi) : (c.charge ?? 0), 's-chg') : '';
     return `<div class="dialog" style="--bc:${k.frame}">
-      <div class="box portrait"><img src="${MC.art(c)}" alt="">${loc.inst.infected ? '<span class="inf-badge">INFECTED</span>' : ''}</div>
+      <div class="box portrait k-${c.kind} ${MC.SHOW_ART || !MC.isMonster(c) ? '' : 'no-art'}">${MC.artHTML(c)}${loc.inst.infected ? '<span class="inf-badge">INFECTED</span>' : ''}</div>
       <div class="dialog-main">
-        <div class="box textbox"><span class="box-tab">${MC.esc(c.name)}</span>
-          <div class="dialog-meta"><b>${k.long}${c.cost != null && c.kind === 'tribute' ? ` · Cost ${c.cost}` : ''}${MC.isMonster(c) && c.kind !== 'basic' ? ` · Footprint ${fp(c)}` : ''}</b>${chips}</div>
+        <div class="box textbox"><span class="box-tab">${MC.esc(c.name)}${MC.costBadge(c)}</span>
+          <div class="dialog-meta"><b>${k.long}</b>${chips}</div>
           <div class="dialog-text">${lines}</div></div>
         <div class="dialog-foot">
           <div class="box ctrlbox">${controlsHTML()}</div>
@@ -751,22 +765,28 @@
     fit();
   }
 
+  /**
+   * Scale the 3D table to fill the stage and centre it both ways.
+   * On the fixed-height desktop layout the stage is a flex child with a known
+   * height; on small screens it has none, so the table sizes the stage instead.
+   */
   function fit() {
     const stage = root.querySelector('.stage'), f = root.querySelector('.fit'), t = root.querySelector('.table3d');
     if (!stage || !t) return;
-    f.style.transform = 'none';
-    const natural = t.offsetWidth + 40;
-    let s = Math.min(1.1, stage.clientWidth / natural);
-    f.style.transform = `translateX(-50%) scale(${s})`;
+    const fixed = getComputedStyle(stage).flexGrow !== '0';
+    if (fixed) stage.style.height = '';
     f.style.top = '0px';
-    // Keep the projected table short enough that the hand and dialog stay on screen too.
-    const budget = Math.max(300, window.innerHeight - (window.innerWidth >= 1300 ? 480 : 600));
-    const h = t.getBoundingClientRect().height;
-    if (h > budget) { s = Math.max(0.55 * s, s * budget / h); f.style.transform = `translateX(-50%) scale(${s})`; }
-    const sr = stage.getBoundingClientRect(), tr = t.getBoundingClientRect();
-    // Pull the projected table flush with the stage top, then leave room for its front face.
-    f.style.top = (sr.top - tr.top + 8) + 'px';
-    stage.style.height = (tr.height + 8 + 30 * s) + 'px';
+    f.style.transform = 'translateX(-50%)';
+    const edge = 26; // the table's front face, which getBoundingClientRect doesn't include
+    const r1 = t.getBoundingClientRect();
+    const sw = stage.clientWidth / (r1.width + 24);
+    const sh = fixed ? stage.clientHeight / (r1.height + edge) : Infinity;
+    const s = Math.max(0.3, Math.min(1.4, sw, sh));
+    f.style.transform = `translateX(-50%) scale(${s})`;
+    let sr = stage.getBoundingClientRect(), tr = t.getBoundingClientRect();
+    if (!fixed) { stage.style.height = (tr.height + edge * s + 8) + 'px'; sr = stage.getBoundingClientRect(); }
+    const free = sr.height - tr.height - edge * s;
+    f.style.top = (sr.top - tr.top + Math.max(0, free / 2)) + 'px';
   }
 
   function updateDialog() {

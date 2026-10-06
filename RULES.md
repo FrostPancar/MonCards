@@ -63,9 +63,11 @@ Off-board piles: **Deck**, **Extra Deck**, **Field Deck**, **Graveyard (GY)**.
 
 ### Footprint
 
-Tribute monsters, Extra Deck monsters and Bosses have a **Footprint size**. A monster
-with Footprint *N* occupies *N* adjacent Monster Zones. You can't summon a monster if
-you don't have enough adjacent free zones for its Footprint. Basic monsters always have
+Tribute monsters, Extra Deck monsters and Bosses have a **Footprint size**. The card
+itself still sits in **one** Monster Zone, but a monster with Footprint *N* makes *N − 1*
+neighbouring zones **unusable** (shown with 🚫) while it is on the field. For Footprint 3
+the blocked zones are on both sides; for Footprint 2 the zone to its right is blocked.
+You can't summon a monster if those zones aren't free. Basic monsters always have
 Footprint 1.
 
 ---
@@ -283,14 +285,14 @@ Card anatomy, top to bottom (the app renders cards this way):
 
 ```
 ┌──────────────────────────────┐
-│ NAME                         │
-│ TRIBUTE              COST 7  │  ← card type · Charge Cost (Tribute)
+│ NAME                 COST 7  │  ← Charge Cost sits in the name bar
+│ TRIBUTE                      │  ← card type
 │ ┌──────────────────────────┐ │
 │ │ pixel art          ◆◆◆   │ │  ← Charge as icons (no number; ◇ = 0)
 │ └──────────────────────────┘ │
-│ [🐜 Insect] [Ant]       ▣▣   │  ← Tags (with icons) · Footprint
+│ [🐜] [🐜]            👣 2   │  ← Tag icons (name on hover) · Footprint
 │ ON SUMMON: effect text…      │  ← keyword leads the line
-│ ⚔ 2200            ⛨ 1500     │  ← ATK / DEF   (Actions: COST n · SET +n)
+│ [⚔ 2200]      [⛨ 1500]       │  ← ATK and DEF in their own boxes (Actions: SET +n)
 └──────────────────────────────┘
 ```
 

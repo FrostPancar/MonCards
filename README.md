@@ -27,5 +27,5 @@ Two views:
 | `style.css` | All styling |
 
 The two Insect decks (Hive Queen, Brain-Eating Fungus) are the real lists; names marked
-*working title* in `data/cards.js` still need naming. Art is generated procedurally from each
-card's id (one-colour silhouettes) until real sprites exist.
+*working title* in `data/cards.js` still need naming. Monster art is hidden for now (`MC.SHOW_ART` in `src/core.js` brings the procedural
+sprites back); cards show a dithered placeholder instead.
