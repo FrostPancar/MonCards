@@ -728,5 +728,7 @@ h1, h2, h3, h4 { font-family: var(--f-body); font-weight: 700; margin: 0; }
 
 @keyframes dots-drift { to { background-position: 36px 18px; } }
 
-/* Index option: hide monster art icons to give the effect text more room */
-body.hide-art[data-view="index"] .card:is(.k-basic, .k-tribute, .k-extra, .k-boss) .c-art { display: none; }
+/* Index display options (all card types) */
+body.hide-art[data-view="index"] .card .c-art > * { visibility: hidden; }   /* art icon hidden, layout unchanged */
+body.full-text[data-view="index"] .card .c-art { display: none; }            /* art area removed, text gets the room */
+.detail-btns { display: flex; gap: 10px; flex-wrap: wrap; }

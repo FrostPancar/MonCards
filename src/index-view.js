@@ -7,10 +7,20 @@
   const allTags = () => [...new Set(MC.CARDS.flatMap(c => [...(c.tags || []), ...(c.keywords || [])]))].sort();
   const refresh = () => { renderFilters(); renderGrid(); };
 
-  // Per-viewer preference: hide monster art icons on index cards.
-  let hideArt = false;
-  try { hideArt = localStorage.getItem('mc-hide-art') === '1'; } catch (e) { /* storage blocked */ }
-  document.body.classList.toggle('hide-art', hideArt);
+  // Per-viewer display options for index cards (remembered in this browser):
+  //   hide-art  — hide the art icon, keep the card layout
+  //   full-text — drop the art area so the effect text gets the room
+  const OPTS = { 'hide-art': 'mc-hide-art', 'full-text': 'mc-full-text' };
+  const opt = {};
+  for (const [cls, key] of Object.entries(OPTS)) {
+    try { opt[cls] = localStorage.getItem(key) === '1'; } catch (e) { opt[cls] = false; }
+    document.body.classList.toggle(cls, opt[cls]);
+  }
+  function toggleOpt(cls) {
+    opt[cls] = !opt[cls];
+    document.body.classList.toggle(cls, opt[cls]);
+    try { localStorage.setItem(OPTS[cls], opt[cls] ? '1' : '0'); } catch (e) { /* storage blocked */ }
+  }
 
   function deckSections(deck) {
     return [
@@ -102,7 +112,10 @@
         <h2>${MC.esc(c.name)}</h2>
         <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v?.html ?? MC.esc(v)}</dd>`).join('')}</dl>
         ${inDecks ? `<h4>In decks</h4><ul class="in-decks">${inDecks}</ul>` : ''}
-        <button class="btn" data-edit="${c.id}">${c.custom ? 'Edit in creator' : 'Copy into creator'}</button>
+        <div class="detail-btns">
+          <button class="btn btn-hot" data-edit="${c.id}">Edit</button>
+          <button class="btn" data-dup="${c.id}">Duplicate</button>
+        </div>
       </div></div>`, { wide: true });
   }
 
@@ -126,7 +139,8 @@
           ${allTags().map(t => `<option ${state.tag === t ? 'selected' : ''}>${MC.esc(t)}</option>`).join('')}
         </select></label>
       </div>
-      <button class="chip ${hideArt ? '' : 'on'}" data-art aria-pressed="${!hideArt}">Monster art: ${hideArt ? 'Off' : 'On'}</button>
+      <button class="chip ${opt['hide-art'] ? '' : 'on'}" data-opt="hide-art" aria-pressed="${!opt['hide-art']}">Art icons: ${opt['hide-art'] ? 'Off' : 'On'}</button>
+      <button class="chip ${opt['full-text'] ? 'on' : ''}" data-opt="full-text" aria-pressed="${opt['full-text']}">Full text: ${opt['full-text'] ? 'On' : 'Off'}</button>
       <button class="btn btn-hot" data-create>+ Card Creator</button>`;
   }
 
@@ -142,11 +156,11 @@
         if (e.target.matches('.search')) { state.q = e.target.value; renderGrid(); }
       });
       document.getElementById('modal').addEventListener('click', e => {
-        const ed = e.target.closest('[data-edit]');
+        const ed = e.target.closest('[data-edit], [data-dup]');
         if (!ed) return;
-        const card = MC.byId[ed.dataset.edit];
+        const card = MC.byId[ed.dataset.edit || ed.dataset.dup];
         MC.closeModal();
-        MC.Creator.open(card.custom ? card : { ...card, name: card.name + ' Copy' }, refresh);
+        MC.Creator.open(card, refresh, ed.dataset.edit ? 'edit' : 'copy');
       });
       root.addEventListener('change', e => {
         const s = e.target.dataset.sel;
@@ -168,12 +182,8 @@
         const k = e.target.closest('[data-kind]');
         if (k) { state.kind = k.dataset.kind; renderFilters(); renderGrid(); return; }
         if (e.target.closest('[data-create]')) { MC.Creator.open(null, refresh); return; }
-        if (e.target.closest('[data-art]')) {
-          hideArt = !hideArt;
-          document.body.classList.toggle('hide-art', hideArt);
-          try { localStorage.setItem('mc-hide-art', hideArt ? '1' : '0'); } catch (err) { /* storage blocked */ }
-          renderFilters(); return;
-        }
+        const t = e.target.closest('[data-opt]');
+        if (t) { toggleOpt(t.dataset.opt); renderFilters(); return; }
         const o = e.target.closest('[data-open]');
         if (o) openCard(o.dataset.open);
       });

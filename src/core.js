@@ -248,6 +248,10 @@
     }
     return `url(${cv.toDataURL()})`;
   };
+  const mix = (a, b, t) => {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    return '#' + [16, 8, 0].map(sh => Math.round(((pa >> sh) & 255) * (1 - t) + ((pb >> sh) & 255) * t).toString(16).padStart(2, '0')).join('');
+  };
   const lighten = (hex, a) => {
     const n = parseInt(hex.slice(1), 16);
     return '#' + [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v + (255 - v) * a).toString(16).padStart(2, '0')).join('');
@@ -282,13 +286,14 @@
   const tagGradients = new Set();
   let tagSheet;
   MC.bodyClass = card => {
-    const tag = MC.isMonster(card) && card.tags?.[0];
+    const tag = (MC.isMonster(card) || card.kind === 'action') && card.tags?.[0];
     const tc = tag && MC.TAG_COLORS[tag];
     if (!tc) return '';
     const cls = `tg-${card.kind}-${tag.toLowerCase()}`;
     if (!tagGradients.has(cls)) {
       tagGradients.add(cls);
-      const frame = MC.KINDS[card.kind].frame, centre = lighten(tc, .1);
+      // the tag colour is blended 45% over the card colour so it reads as a soft glow
+      const frame = MC.KINDS[card.kind].frame, centre = mix(frame, tc, .45);
       tagSheet ||= document.head.appendChild(document.createElement('style'));
       tagSheet.textContent += `.card.${cls},.mini.${cls},.portrait.${cls}{` +
         `--d-body:${MC.ditherRadial(centre, frame, 100, 140)};--d-body-sm:${MC.ditherRadial(centre, frame, 40, 56)};` +

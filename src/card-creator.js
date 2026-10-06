@@ -1,22 +1,38 @@
 /*
- * Card Creator: design a card with a live preview.
- * Custom cards are kept in this browser (localStorage) and merged into the pool
- * on load; "Copy code" gives a snippet to paste into data/cards.js to make it permanent.
+ * Card Creator: design or edit a card with a live preview.
+ *
+ * Two kinds of saved changes live in this browser (localStorage):
+ *   - new cards made in the creator (shown with a "Custom" badge), and
+ *   - edits to existing cards, stored as overrides keyed by card id.
+ * Both are merged into the pool on load. "Copy code" gives a snippet to paste
+ * into data/cards.js to make a card permanent.
  */
 (function () {
   const MC = window.MC;
-  const STORE = 'mc-custom-cards';
+  const NEW_KEY = 'mc-custom-cards', EDIT_KEY = 'mc-card-edits';
 
-  const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch (e) { return []; } };
-  const save = list => { try { localStorage.setItem(STORE, JSON.stringify(list)); return true; } catch (e) { return false; } };
+  const read = (key, empty) => { try { return JSON.parse(localStorage.getItem(key) || empty); } catch (e) { return JSON.parse(empty); } };
+  const write = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; } };
 
   function reindex() {
     MC.byId = Object.fromEntries(MC.CARDS.map(c => [c.id, c]));
     MC._byName = null;
   }
 
-  // Merge saved custom cards into the pool before any view renders.
-  load().forEach(c => { c.custom = true; MC.CARDS.push(c); });
+  // Originals of the built-in cards, so edits can be reset.
+  const ORIGINAL = Object.fromEntries(MC.CARDS.map(c => [c.id, JSON.parse(JSON.stringify(c, (k, v) => v === Infinity ? 'Infinity' : v),
+    (k, v) => v === 'Infinity' ? Infinity : v)]));
+
+  // Merge saved edits and new cards into the pool before any view renders.
+  const edits = read(EDIT_KEY, '{}');
+  const applyEdit = (c, e) => {
+    const { _cleared = [], ...fields } = e;
+    const card = { ...c, ...fields, edited: true };
+    _cleared.forEach(k => delete card[k]);
+    return card;
+  };
+  MC.CARDS.forEach((c, i) => { if (edits[c.id]) MC.CARDS[i] = applyEdit(c, edits[c.id]); });
+  read(NEW_KEY, '[]').forEach(c => { c.custom = true; MC.CARDS.push(c); });
   reindex();
 
   const MONSTER = ['basic', 'tribute', 'extra', 'boss'];
@@ -29,12 +45,15 @@
     method: ['extra'],
     archetype: ['barrier'],
   };
+  // Stats the form owns: cleared from an edited card when its new type doesn't use them.
+  const FORM_KEYS = ['atk', 'def', 'charge', 'cost', 'setCost', 'footprint', 'method', 'archetype', 'tags', 'text'];
   const KNOWN_TAGS = Object.keys(MC.TAG_COLORS).filter(t => t !== 'Infected');
+  const TEXT_FLAGS = ['blocker', 'unblockable', 'rubble'];
 
-  /** Engine flags follow from the text, so keyword lines just work on the table. */
-  function deriveFlags(text) {
+  /** Engine flags that follow from the text, so keyword lines just work on the table. */
+  function deriveFlags(text, base = {}) {
     const lines = (text || '').split('\n').map(l => l.trim().toLowerCase());
-    const flags = {};
+    const flags = Object.fromEntries(Object.entries(base).filter(([k]) => !TEXT_FLAGS.includes(k)));
     if (lines.some(l => l.startsWith('blocker'))) flags.blocker = true;
     if (lines.some(l => l.startsWith('unblockable'))) flags.unblockable = true;
     if (lines.some(l => l.startsWith('rubble:'))) flags.rubble = true;
@@ -42,24 +61,22 @@
   }
 
   const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'card';
-  function uniqueId(name, keep) {
+  function newId(name) {
     const base = slug(name);
-    if (keep && (!MC.byId[keep] || MC.byId[keep].custom)) return keep;
     let id = base, n = 2;
     while (MC.byId[id]) id = `${base}-${n++}`;
     return id;
   }
 
-  /** Read the form into a card object. */
-  function readForm(form, id) {
+  /** Read the form into card fields (only what the form controls). */
+  function readForm(form) {
     const v = n => form.elements[n]?.value ?? '';
     const num = n => v(n) === '' ? undefined : Number(v(n));
     const kind = v('kind');
     const on = f => FIELDS[f].includes(kind);
     const tags = [...form.querySelectorAll('[name=tag]:checked')].map(x => x.value)
       .concat(v('moreTags').split(',').map(t => t.trim()).filter(Boolean));
-    const text = v('text').trim();
-    const card = { id, name: v('name').trim() || 'Untitled', kind };
+    const card = { name: v('name').trim() || 'Untitled', kind };
     if (on('atk')) { card.atk = num('atk') ?? 0; card.def = num('def') ?? 0; }
     if (on('charge')) card.charge = num('charge') ?? 0;
     if (on('cost')) card.cost = num('cost') ?? 0;
@@ -68,16 +85,25 @@
     if (on('method')) card.method = v('method');
     if (on('archetype')) card.archetype = v('archetype').trim() || 'On Destroy';
     if (tags.length) card.tags = [...new Set(tags)];
-    card.text = text;
-    const flags = deriveFlags(text);
-    if (flags) card.flags = flags;
+    card.text = v('text').trim();
+    return card;
+  }
+
+  /** Combine form fields with the card being edited, keeping engine extras (charge bonuses, auras…). */
+  function build(form, id, base) {
+    const f = readForm(form);
+    const kept = base ? Object.fromEntries(Object.entries(base).filter(([k]) => !FORM_KEYS.includes(k) && !['edited', 'custom'].includes(k))) : {};
+    const card = { ...kept, ...f, id };
+    const flags = deriveFlags(f.text, base?.flags);
+    if (flags) card.flags = flags; else delete card.flags;
     return card;
   }
 
   /** The card as a JS literal for data/cards.js. */
   function toCode(card) {
-    const { custom, ...c } = card;
-    return '  ' + JSON.stringify(c, null, 0)
+    const { custom, edited, ...c } = card;
+    return '  ' + JSON.stringify(c, (k, v) => v === Infinity ? '__INF__' : v)
+      .replace(/"__INF__"/g, 'Infinity')
       .replace(/"([a-zA-Z]+)":/g, '$1: ').replace(/,(?=[a-z]+: )/g, ', ') + ',';
   }
 
@@ -86,13 +112,21 @@
   }
 
   MC.Creator = {
-    /** Open the creator. `base` pre-fills it (editing a custom card, or copying any card). */
-    open(base, onSaved) {
-      const editing = base?.custom ? base.id : null;
-      const b = base || { kind: 'basic', name: '', atk: 1000, def: 1000, charge: 1, text: '' };
+    /**
+     * Open the creator.
+     *   open()                  — a brand-new card
+     *   open(card, cb, 'edit')  — edit that card in place (any card)
+     *   open(card, cb, 'copy')  — a new card pre-filled from that card
+     */
+    open(base, onSaved, mode = base ? 'edit' : 'new') {
+      const editing = mode === 'edit' ? base.id : null;
+      const builtin = editing && !base.custom;
+      const b = base ? { ...base, name: mode === 'copy' ? base.name + ' Copy' : base.name }
+        : { kind: 'basic', name: '', atk: 1000, def: 1000, charge: 1, text: '' };
       const opt = (val, cur, label = val) => `<option value="${val}" ${val === cur ? 'selected' : ''}>${label}</option>`;
+      const canReset = builtin && base.edited;
       const box = MC.modal(`
-        <span class="eyebrow">${editing ? 'Edit custom card' : base ? 'New card from a copy' : 'New card'}</span>
+        <span class="eyebrow">${editing ? (builtin ? 'Edit card' : 'Edit custom card') : mode === 'copy' ? 'New card from a copy' : 'New card'}</span>
         <h2>Card Creator</h2>
         <div class="creator">
           <form class="cc-form" autocomplete="off">
@@ -124,54 +158,74 @@
             <div class="cc-actions">
               <button class="btn btn-hot" data-cc="save">${editing ? 'Save changes' : 'Add to card pool'}</button>
               <button class="btn" data-cc="copy">Copy code</button>
-              ${editing ? '<button class="btn" data-cc="delete">Delete</button>' : ''}
+              ${editing && !builtin ? '<button class="btn" data-cc="delete">Delete</button>' : ''}
+              ${canReset ? '<button class="btn" data-cc="reset">Reset to original</button>' : ''}
             </div>
             <textarea class="cc-code" readonly rows="4" hidden></textarea>
-            <p class="cc-note">Custom cards are saved in this browser. Use <b>Copy code</b> to add one to <code>data/cards.js</code> for good.</p>
+            <p class="cc-note">${builtin
+              ? 'Edits are saved in this browser and apply everywhere, including decks on the table. Use <b>Copy code</b> to update <code>data/cards.js</code> for good.'
+              : 'Custom cards are saved in this browser. Use <b>Copy code</b> to add one to <code>data/cards.js</code> for good.'}</p>
           </div>
         </div>`, { wide: true });
 
       const form = box.querySelector('.cc-form');
       const preview = box.querySelector('.cc-card');
+      const current = () => build(form, editing || 'preview', editing ? base : null);
       const update = () => {
         const kind = form.elements.kind.value;
         form.querySelectorAll('[data-for]').forEach(el => { el.hidden = !FIELDS[el.dataset.for].includes(kind); });
-        preview.innerHTML = MC.renderCard(readForm(form, editing || 'preview'), { extraClass: 'card-xl' });
+        preview.innerHTML = MC.renderCard(current(), { extraClass: 'card-xl' });
       };
       form.addEventListener('input', update);
       form.addEventListener('submit', e => e.preventDefault());
       update();
 
+      const finish = (card, msg) => { reindex(); MC.closeModal(); MC.toast(msg); onSaved?.(card); };
+
       box.addEventListener('click', e => {
         const act = e.target.closest('[data-cc]')?.dataset.cc;
         if (!act) return;
         if (act === 'copy') {
-          const code = toCode(readForm(form, uniqueId(form.elements.name.value, editing)));
+          const code = toCode(build(form, editing || newId(form.elements.name.value), editing ? base : null));
           const ta = box.querySelector('.cc-code');
           ta.hidden = false; ta.value = code; ta.select();
           (navigator.clipboard?.writeText(code) || Promise.reject()).then(() => MC.toast('Card code copied'), () => MC.toast('Code shown below — copy it from there'));
           return;
         }
-        const list = load();
         if (act === 'delete') {
-          save(list.filter(c => c.id !== editing));
+          write(NEW_KEY, read(NEW_KEY, '[]').filter(c => c.id !== editing));
           MC.CARDS.splice(MC.CARDS.findIndex(c => c.id === editing), 1);
-          reindex();
-          MC.closeModal(); MC.toast('Card deleted'); onSaved?.();
+          finish(null, 'Card deleted');
           return;
         }
+        if (act === 'reset') {
+          const all = read(EDIT_KEY, '{}'); delete all[editing]; write(EDIT_KEY, all);
+          MC.CARDS[MC.CARDS.findIndex(c => c.id === editing)] = ORIGINAL[editing];
+          finish(ORIGINAL[editing], `${ORIGINAL[editing].name} reset`);
+          return;
+        }
+        // save
         if (!form.elements.name.value.trim()) { MC.toast('Give the card a name first'); form.elements.name.focus(); return; }
-        const card = readForm(form, uniqueId(form.elements.name.value, editing));
-        card.custom = true;
-        const i = MC.CARDS.findIndex(c => c.id === editing);
-        if (i > -1) MC.CARDS[i] = card; else MC.CARDS.push(card);
-        const stored = list.filter(c => c.id !== editing && c.id !== card.id);
+        let ok;
+        if (builtin) {
+          const card = { ...build(form, editing, ORIGINAL[editing]), edited: true };
+          const all = read(EDIT_KEY, '{}');
+          const { id, edited, ...fields } = card;
+          // store only the form-owned fields (and flags) so engine extras still come from data/cards.js
+          all[editing] = Object.fromEntries(Object.entries(fields).filter(([k]) => FORM_KEYS.includes(k) || ['name', 'kind', 'flags'].includes(k)));
+          all[editing]._cleared = FORM_KEYS.filter(k => !(k in fields)); // e.g. ATK after turning a monster into an Action
+          ok = write(EDIT_KEY, all);
+          MC.CARDS[MC.CARDS.findIndex(c => c.id === editing)] = card;
+          finish(card, ok ? `${card.name} updated` : `${card.name} updated for this session (browser storage is blocked)`);
+          return;
+        }
+        const card = { ...build(form, editing || newId(form.elements.name.value), editing ? base : null), custom: true };
+        const stored = read(NEW_KEY, '[]').filter(c => c.id !== card.id);
         stored.push(card);
-        const ok = save(stored);
-        reindex();
-        MC.closeModal();
-        MC.toast(ok ? `${card.name} saved` : `${card.name} added for this session (browser storage is blocked)`);
-        onSaved?.(card);
+        ok = write(NEW_KEY, stored);
+        const i = MC.CARDS.findIndex(c => c.id === card.id);
+        if (i > -1) MC.CARDS[i] = card; else MC.CARDS.push(card);
+        finish(card, ok ? `${card.name} saved` : `${card.name} added for this session (browser storage is blocked)`);
       });
     },
   };
