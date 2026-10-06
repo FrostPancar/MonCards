@@ -29,6 +29,8 @@ body {
   background-color: var(--bg);
   background-image: radial-gradient(var(--dot) 2px, transparent 2.5px);
   background-size: 18px 18px;
+  /* dots drift slowly toward the bottom right (2px right for every 1px down) */
+  animation: dots-drift 9s linear infinite;
   color: var(--ink);
   font-family: var(--f-body);
   font-size: 18px;
@@ -186,7 +188,8 @@ h1, h2, h3, h4 { font-family: var(--f-body); font-weight: 700; margin: 0; }
 .tag-fp { margin-left: auto; --tc: var(--ink); }
 .tag-fp b { font-family: var(--f-num); font-weight: 700; }
 .c-text {
-  flex: 1; min-height: 0; overflow: hidden;
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: none;
   background: #fff; border: .14em solid var(--ink); border-radius: .55em;
   padding: .3em .45em;
   font-size: .72em; line-height: 1.12;
@@ -648,7 +651,9 @@ h1, h2, h3, h4 { font-family: var(--f-body); font-weight: 700; margin: 0; }
 .textbox { flex: 1; }
 .tab-tags { display: inline-flex; gap: 4px; margin-left: 4px; }
 .tab-tags .tag { font-size: 13px; }
-.dialog-text { font-size: 19px; line-height: 1.15; }
+.dialog-text { font-size: 19px; line-height: 1.15; scrollbar-width: none; overscroll-behavior: contain; }
+/* scrollable card text, without a visible scrollbar */
+.c-text::-webkit-scrollbar, .dialog-text::-webkit-scrollbar { display: none; }
 .dialog-text p { margin: 0 0 4px; }
 .dialog-foot { display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap; }
 .ctrlbox { flex: 1 1 300px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 12px; }
@@ -720,3 +725,8 @@ h1, h2, h3, h4 { font-family: var(--f-body); font-weight: 700; margin: 0; }
   .creator { grid-template-columns: 1fr; }
   .cc-preview { position: static; width: 100%; }
 }
+
+@keyframes dots-drift { to { background-position: 36px 18px; } }
+
+/* Index option: hide monster art icons to give the effect text more room */
+body.hide-art[data-view="index"] .card:is(.k-basic, .k-tribute, .k-extra, .k-boss) .c-art { display: none; }

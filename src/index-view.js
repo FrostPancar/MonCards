@@ -7,6 +7,11 @@
   const allTags = () => [...new Set(MC.CARDS.flatMap(c => [...(c.tags || []), ...(c.keywords || [])]))].sort();
   const refresh = () => { renderFilters(); renderGrid(); };
 
+  // Per-viewer preference: hide monster art icons on index cards.
+  let hideArt = false;
+  try { hideArt = localStorage.getItem('mc-hide-art') === '1'; } catch (e) { /* storage blocked */ }
+  document.body.classList.toggle('hide-art', hideArt);
+
   function deckSections(deck) {
     return [
       ['Boss', [[deck.boss, 1]]],
@@ -121,6 +126,7 @@
           ${allTags().map(t => `<option ${state.tag === t ? 'selected' : ''}>${MC.esc(t)}</option>`).join('')}
         </select></label>
       </div>
+      <button class="chip ${hideArt ? '' : 'on'}" data-art aria-pressed="${!hideArt}">Monster art: ${hideArt ? 'Off' : 'On'}</button>
       <button class="btn btn-hot" data-create>+ Card Creator</button>`;
   }
 
@@ -162,6 +168,12 @@
         const k = e.target.closest('[data-kind]');
         if (k) { state.kind = k.dataset.kind; renderFilters(); renderGrid(); return; }
         if (e.target.closest('[data-create]')) { MC.Creator.open(null, refresh); return; }
+        if (e.target.closest('[data-art]')) {
+          hideArt = !hideArt;
+          document.body.classList.toggle('hide-art', hideArt);
+          try { localStorage.setItem('mc-hide-art', hideArt ? '1' : '0'); } catch (err) { /* storage blocked */ }
+          renderFilters(); return;
+        }
         const o = e.target.closest('[data-open]');
         if (o) openCard(o.dataset.open);
       });
