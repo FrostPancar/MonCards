@@ -283,19 +283,22 @@ Card anatomy, top to bottom (the app renders cards this way):
 
 ```
 ┌──────────────────────────────┐
-│ NAME                    ◆ 3  │  ← Charge
+│ NAME                         │
 │ TRIBUTE              COST 7  │  ← card type · Charge Cost (Tribute)
 │ ┌──────────────────────────┐ │
-│ │        pixel art         │ │
+│ │ pixel art          ◆◆◆   │ │  ← Charge as icons (no number; ◇ = 0)
 │ └──────────────────────────┘ │
-│ [🐜 Insect] [🛡 Blocker] ▣▣  │  ← Tags (with icons) · Keywords · Footprint
-│ Effect text…                 │
+│ [🐜 Insect] [Ant]       ▣▣   │  ← Tags (with icons) · Footprint
+│ ON SUMMON: effect text…      │  ← keyword leads the line
 │ ⚔ 2200            ⛨ 1500     │  ← ATK / DEF   (Actions: COST n · SET +n)
 └──────────────────────────────┘
 ```
 
 The frame color shows the card type (§6). Every card has a white rim and black outline,
 like a physical card.
+
+**Effect keywords** open a line when they fit: *Once per turn*, *On Summon*, *On Destroy*,
+*On Tribute*, *Summon* (how the card is summoned), *Blocker*, *Unblockable*.
 
 ---
 

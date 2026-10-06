@@ -13,7 +13,7 @@ python3 -m http.server 8000   # then visit http://localhost:8000
 Two views:
 
 - **Card Index** (`#index`): browse every card, filter by kind, tag or search, and pick a deck to see its list and legality check.
-- **Play Table** (`#table`): a hot-seat mockup duel on a 3D pixel table. Drag cards (hand → zones, field → other zones / GY / hand / deck) or click them. It enforces zones, footprint, charge costs (including conditional Charge bonuses), Blockers, Barrier triggers, battle damage and turn-1 rules. Other card effects you apply by hand from the dialog box. A mosaic **pixel filter** (Off / 2x / 3x) sits over the whole view. It opens on a demo board; use **New duel** for the full setup flow (deck pick → field selection → draw 7).
+- **Play Table** (`#table`): a hot-seat mockup duel on a 3D pixel table. Drag cards (hand → zones, field → other zones / GY / hand / deck) or click them. It enforces zones, footprint, charge costs (including conditional Charge bonuses), Blockers, Barrier triggers, battle damage and turn-1 rules. Other card effects you apply by hand from the dialog box. A mosaic **pixel filter** (Off / 2x / 3x) sits over the 3D table; UI and text stay sharp. It opens on a demo board; use **New duel** for the full setup flow (deck pick → field selection → draw 7).
 
 ## Layout
 
