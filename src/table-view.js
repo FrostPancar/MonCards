@@ -805,7 +805,7 @@
       : c.kind === 'action' ? `<span class="stat stat-set">SET <b>${MC.setCostLabel(c)}</b></span>` : `<span class="stat-label">${MC.esc(c.archetype || k.long)}</span>`;
     const ch = c.charge != null || c.id === SHELL ? MC.chargePips(live ? charge(loc.inst, loc.pi) : (c.charge ?? 0), 's-chg') : '';
     return `<div class="dialog" style="--bc:${k.frame}">
-      <div class="box portrait k-${c.kind} ${MC.SHOW_ART && MC.isMonster(c) ? '' : 'no-art'}">${MC.artHTML(c)}${loc.inst.infected ? '<span class="inf-badge">INFECTED</span>' : ''}</div>
+      <div class="box portrait k-${c.kind} ${MC.bodyClass(c)} ${MC.SHOW_ART && MC.isMonster(c) ? '' : 'no-art'}">${MC.artHTML(c)}${loc.inst.infected ? '<span class="inf-badge">INFECTED</span>' : ''}</div>
       <div class="dialog-main">
         <div class="box textbox"><span class="box-tab">${MC.esc(c.name)}<span class="tab-tags">${chips}</span>${MC.costBadge(c)}</span>
           <div class="dialog-text">${lines}</div></div>

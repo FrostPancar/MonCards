@@ -274,6 +274,29 @@
   })();
 
   /** The tag that best identifies a card (sub-tags like Ant / Golem win over Insect / Stone). */
+  /**
+   * Monster backgrounds: a radial dither from the first tag's colour in the
+   * centre out to the card-type colour at the edges. One CSS class per
+   * type+tag pair, generated the first time it is needed.
+   */
+  const tagGradients = new Set();
+  let tagSheet;
+  MC.bodyClass = card => {
+    const tag = MC.isMonster(card) && card.tags?.[0];
+    const tc = tag && MC.TAG_COLORS[tag];
+    if (!tc) return '';
+    const cls = `tg-${card.kind}-${tag.toLowerCase()}`;
+    if (!tagGradients.has(cls)) {
+      tagGradients.add(cls);
+      const frame = MC.KINDS[card.kind].frame, centre = lighten(tc, .1);
+      tagSheet ||= document.head.appendChild(document.createElement('style'));
+      tagSheet.textContent += `.card.${cls},.mini.${cls},.portrait.${cls}{` +
+        `--d-body:${MC.ditherRadial(centre, frame, 100, 140)};--d-body-sm:${MC.ditherRadial(centre, frame, 40, 56)};` +
+        `--d-wide:${MC.ditherRadial(centre, frame, 120, 64)}}`;
+    }
+    return cls;
+  };
+
   MC.mainTag = card => {
     const t = card.tags || [];
     return ['Golem', 'Ant'].find(x => t.includes(x)) || t[0];
@@ -375,7 +398,7 @@
   /** Full-size card. opts: { faceDown, extraClass } */
   MC.renderCard = function (card, opts = {}) {
     if (opts.faceDown) return MC.renderBack(MC.backOf(card), 'card ' + (opts.extraClass || ''));
-    return `<div class="card k-${card.kind} ${opts.extraClass || ''}" data-card="${card.id}">
+    return `<div class="card k-${card.kind} ${MC.bodyClass(card)} ${opts.extraClass || ''}" data-card="${card.id}">
       <div class="c-head"><span class="c-name">${MC.esc(card.name)}</span>${card.charge != null ? MC.chargePips(card.charge, 'c-charge') : ''}${MC.costBadge(card)}</div>
       <div class="c-art ${MC.SHOW_ART && MC.isMonster(card) ? 'has-art' : ''}">${MC.artHTML(card)}</div>
       <div class="c-tags">${(card.tags || []).map(MC.tagChip).join('')}${footprint(card)}</div>
@@ -402,7 +425,7 @@
     const boosted = opts.charge != null && opts.charge !== card.charge;
     const charge = ch != null ? MC.chargePips(ch, `m-charge ${boosted ? 'up' : ''}`) : '';
     const tag = MC.mainTag(card);
-    return `<div class="mini k-${card.kind} ${opts.extraClass || ''}" ${opts.attrs || ''}>
+    return `<div class="mini k-${card.kind} ${MC.bodyClass(card)} ${opts.extraClass || ''}" ${opts.attrs || ''}>
       <div class="m-name">${MC.esc(card.name)}</div>
       <div class="m-art ${MC.SHOW_ART && MC.isMonster(card) ? '' : 'no-art'}">${MC.artHTML(card)}${charge}
         ${tag ? `<span class="m-tag" style="--tc:${MC.TAG_COLORS[tag]}">${MC.icon(tag)}</span>` : ''}
