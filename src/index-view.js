@@ -9,7 +9,7 @@
   function deckSections(deck) {
     return [
       ['Boss', [[deck.boss, 1]]],
-      ['Barriers', deck.barriers.map(id => [id, 1])],
+      ['Barriers', Object.entries(deck.barriers.reduce((m, id) => ({ ...m, [id]: (m[id] || 0) + 1 }), {}))],
       ['Field Deck', deck.field.map(id => [id, 1])],
       ['Main Deck', deck.main],
       ['Extra Deck', deck.extra],
