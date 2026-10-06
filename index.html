@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MonCards</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true"><img id="skull" alt=""></div>
+
+  <header class="topbar">
+    <a class="logo" href="#index">MON<span>CARDS</span></a>
+    <nav class="tabs">
+      <a href="#index" data-view="index">Card Index</a>
+      <a href="#table" data-view="table">Play Table</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="view-index" class="view"></section>
+    <section id="view-table" class="view"></section>
+  </main>
+
+  <div id="modal" class="modal" hidden></div>
+  <div id="toast" class="toast" hidden></div>
+  <div class="crt" aria-hidden="true"></div>
+
+  <script src="data/cards.js"></script>
+  <script src="src/core.js"></script>
+  <script src="src/index-view.js"></script>
+  <script src="src/table-view.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
