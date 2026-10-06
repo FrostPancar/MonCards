@@ -151,7 +151,9 @@
             ${field('Effect text', `<textarea name="text" rows="5" placeholder="On Summon: draw 1.">${MC.esc(b.text || '')}</textarea>`)}
             <p class="cc-help">One effect per line. Start a line with <b>Once per turn:</b>, <b>On Summon:</b>, <b>On Destroy:</b>,
               <b>On Tribute:</b>, <b>Summon:</b>, <b>Rubble:</b>, <b>Boss Zone:</b>, <b>Blocker.</b> or <b>Unblockable.</b> for a keyword pill.
-              Put card names in "quotes" to turn them into pills.</p>
+              Put card names in "quotes" to turn them into pills.
+              Make any word a keyword with <b>[Brackets]</b>, add a colour with <b>[Two Words]{red}</b>, or put a colour after a single word: <b>Frenzy{purple}</b>.
+              Colours: red, orange, yellow, green, teal, blue, purple, pink, brown, gray, black or a #hex code.</p>
           </form>
           <div class="cc-preview">
             <div class="cc-card"></div>

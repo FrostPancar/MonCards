@@ -307,6 +307,11 @@ like a physical card.
 **Effect keywords** open a line when they fit: *Once per turn*, *On Summon*, *On Destroy*,
 *On Tribute*, *Summon* (how the card is summoned), *Blocker*, *Unblockable*.
 
+Any other word can be styled as a keyword in card text: `[Frenzy]` makes a pill,
+`[Swarm Call]{red}` gives it a colour, and `Burning{orange}` colours a single word.
+Colours: red, orange, yellow, green, teal, blue, purple, pink, brown, gray, black or a hex
+code such as `{#3a7ced}`.
+
 ---
 
 ## 10. Decklists

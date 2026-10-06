@@ -79,9 +79,38 @@
   const KW_RE = new RegExp(`^(${KEYWORDS.join('|')})([:.])\\s*`, 'i');
   const byName = () => (MC._byName ||= Object.fromEntries(MC.CARDS.map(c => [c.name.toLowerCase(), c])));
   /** Escape text, turning "Card Name" references into pills in that card's type colour. */
+  /**
+   * Custom keyword pills anywhere in a line:
+   *   [Any words]          pill in the default colour
+   *   [Any words]{red}     pill in a named or #hex colour
+   *   Word{red}            a single word as a coloured pill
+   */
+  const PILL_COLORS = {
+    red: '#e8384c', orange: '#f08a2a', yellow: '#e0b81e', green: '#2fa84a', teal: '#26b8a6',
+    blue: '#2f6be0', purple: '#8a4ad8', pink: '#e04cb8', brown: '#8a6a4a', gray: '#6a6a80', grey: '#6a6a80', black: '#2a2838',
+  };
+  const PILL_DEFAULT = '#4a5a8a';
+  const pillDither = {};
+  function customPill(label, color) {
+    let c = PILL_COLORS[(color || '').toLowerCase()];
+    if (!c && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color || '')) c = color.length === 4 ? '#' + [...color.slice(1)].map(x => x + x).join('') : color;
+    c ||= PILL_DEFAULT;
+    pillDither[c] ||= MC.dither(c, shade(c, 1.35), 40, true);
+    return `<b class="kw kw-custom" style="--d-kw:${pillDither[c]};--kw2:${shade(c, 1.35)}">${MC.esc(label)}</b>`;
+  }
+  const PILL_RE = /\[([^\]\n]+)\](?:\{(#?\w+)\})?|([A-Za-z0-9][\w'-]*)\{(#?\w+)\}/g;
+  function withPills(text) {
+    let out = '', last = 0;
+    for (const m of text.matchAll(PILL_RE)) {
+      out += MC.esc(text.slice(last, m.index)) + customPill(m[1] ?? m[3], m[2] ?? m[4]);
+      last = m.index + m[0].length;
+    }
+    return out + MC.esc(text.slice(last));
+  }
+
   function withRefs(text) {
     return text.split(/"([^"]+)"/).map((part, i) => {
-      if (i % 2 === 0) return MC.esc(part);
+      if (i % 2 === 0) return withPills(part);
       const c = byName()[part.toLowerCase()];
       return c ? `<b class="ref k-${c.kind}">${MC.esc(c.name)}</b>` : MC.esc(`"${part}"`);
     }).join('');
