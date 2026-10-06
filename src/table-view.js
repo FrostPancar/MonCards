@@ -113,6 +113,7 @@
       if ((i = p.monsters.findIndex(m => m.inst.uid === uid)) > -1) return { pi, where: 'mon', i, inst: p.monsters[i].inst };
       if ((i = p.actions.findIndex(a => a && a.inst.uid === uid)) > -1) return { pi, where: 'act', i, inst: p.actions[i].inst, slot: p.actions[i] };
       if ((i = p.barriers.findIndex(b => b.inst.uid === uid)) > -1) return { pi, where: 'bar', i, inst: p.barriers[i].inst, slot: p.barriers[i] };
+      if ((i = p.barriers.findIndex(b => b.rubble?.uid === uid)) > -1) return { pi, where: 'rubble', i, inst: p.barriers[i].rubble, slot: p.barriers[i] };
       if (p.field && p.field.inst.uid === uid) return { pi, where: 'field', inst: p.field.inst, slot: p.field };
       if (p.boss && p.boss.uid === uid) return { pi, where: 'boss', inst: p.boss };
       if ((i = p.gy.findIndex(x => x.uid === uid)) > -1) return { pi, where: 'gy', i, inst: p.gy[i] };
@@ -136,6 +137,7 @@
       case 'extra': p.extra.splice(loc.i, 1); break;
       case 'deck': p.deck.splice(loc.i, 1); break;
       case 'boss': p.boss = null; break;
+      case 'rubble': p.barriers[loc.i].rubble = null; break;
     }
     return loc.inst;
   }
@@ -146,11 +148,34 @@
     if (inst.card.kind === 'boss') P(pi).boss = inst; else P(pi).gy.push(inst);
   }
 
-  /** Remove a monster from the field. */
-  function removeMonster(pi, uid, verb) {
+  /**
+   * Rubble: a destroyed monster with a "Rubble:" effect goes to a free Barrier Zone
+   * (preferring one whose Barrier is already down) instead of the GY.
+   */
+  function freeRubbleZone(pi) {
+    const bs = P(pi).barriers;
+    const i = bs.findIndex(b => !b.rubble && b.faceDown);
+    return i > -1 ? i : bs.findIndex(b => !b.rubble);
+  }
+  function makeRubble(pi, inst) {
+    const z = freeRubbleZone(pi);
+    if (z < 0) return false;
+    P(pi).barriers[z].rubble = reset(inst);
+    log(`${inst.card.name} crumbles into Rubble in Barrier Zone ${z + 1}.`);
+    return true;
+  }
+
+  /** Remove a monster from the field. `destroyed` lets Rubble monsters crumble into a Barrier Zone. */
+  function removeMonster(pi, uid, verb, destroyed) {
     const loc = locate(uid);
     if (!loc || loc.where !== 'mon') return null;
     const inst = detach(loc);
+    if (destroyed && inst.card.flags?.rubble && freeRubbleZone(pi) > -1) {
+      log(`${inst.card.name} ${verb}.`);
+      makeRubble(pi, inst);
+      if (S.sel === uid) S.sel = null;
+      return inst;
+    }
     bury(pi, inst);
     log(`${inst.card.name} ${verb}${inst.card.kind === 'boss' ? ' — returns to the Boss Zone' : ''}.`);
     if (S.sel === uid) S.sel = null;
@@ -237,9 +262,13 @@
     if (!loc || loc.pi !== m.pi || uid === m.exclude) return false;
     if (loc.where === 'mon') return !m.basicOnly || loc.inst.card.kind === 'basic';
     if (loc.where === 'hand') return !!m.allowHand;
+    if (loc.where === 'rubble') return true; // Rubble can always be tributed for Charge
     return false;
   }
-  const paidSoFar = () => [...S.mode.picks].reduce((s, uid) => s + charge(locate(uid).inst, S.mode.pi, S.mode.ctx), 0);
+  const paidSoFar = () => [...S.mode.picks].reduce((s, uid) => {
+    const loc = locate(uid);
+    return s + charge(loc.inst, S.mode.pi, S.mode.ctx) + (loc.where === 'rubble' ? loc.inst.card.chargeBonus?.rubble || 0 : 0);
+  }, 0);
   function confirmPay() {
     const m = S.mode, p = P(m.pi);
     const total = paidSoFar();
@@ -314,6 +343,13 @@
     P(ap).attacked.add(attacker.uid);
     if (target.kind === 'barrier') {
       const b = P(dp).barriers[target.i];
+      if (b.rubble) { // attacking Rubble destroys the Rubble card, not the Barrier beneath
+        const rb = b.rubble;
+        b.rubble = null; P(dp).gy.push(rb);
+        log(`${attacker.card.name} smashes ${rb.card.name}'s Rubble — sent to the GY.`);
+        if (rb.id === 'geode-crawler') log(`↳ Geode Crawler: ${P(dp).name} draws 2.`), draw(P(dp)), draw(P(dp));
+        return;
+      }
       b.faceDown = true;
       log(`${attacker.card.name} smashes ${b.inst.card.name} (Barrier destroyed).`);
       if (b.inst.card.onBreak === 'infectAttacker') { attacker.infected = true; log(`↳ ${b.inst.card.name}: ${attacker.card.name} is Infected!`); }
@@ -329,12 +365,12 @@
     log(`${attacker.card.name} (ATK ${a}) attacks ${t.card.name} (DEF ${d}).`);
     if (a > d) {
       const loss = lpLossFor(t);
-      removeMonster(dp, t.uid, 'is destroyed in battle');
+      removeMonster(dp, t.uid, 'is destroyed in battle', true);
       loseLp(dp, loss, `${t.card.name} destroyed`);
     } else if (a === d) {
       const l1 = lpLossFor(t), l2 = lpLossFor(attacker);
-      removeMonster(dp, t.uid, 'is destroyed in battle');
-      removeMonster(ap, attacker.uid, 'is destroyed in battle');
+      removeMonster(dp, t.uid, 'is destroyed in battle', true);
+      removeMonster(ap, attacker.uid, 'is destroyed in battle', true);
       loseLp(dp, l1, `${t.card.name} destroyed`);
       loseLp(ap, l2, `${attacker.card.name} destroyed`);
     } else {
@@ -403,6 +439,37 @@
     S.log = [];
     log('Demo board loaded — turn 5, Player 1 Main Phase. Drag cards or click them.');
   }
+
+  /** Bedrock Golems vs Hive Queen, with Rubble already in the Barrier Zones. */
+  function demoGolem() {
+    newDuel('golem', 'hive');
+    const [a, b] = S.players;
+    a.field = { inst: a.fieldDeck.splice(0, 1)[0], faceDown: false };
+    b.field = { inst: b.fieldDeck.splice(0, 1)[0], faceDown: false };
+    a.monsters.push({ inst: take(a, 'granite-brute'), at: 0 });
+    a.monsters.push({ inst: take(a, 'cobble-guard'), at: 1 });
+    a.monsters.push({ inst: take(a, 'monolith-warden'), at: 3 });
+    a.actions[0] = { inst: take(a, 'rockfall'), faceDown: true };
+    a.barriers[0].faceDown = true; a.barriers[2].faceDown = true;
+    a.barriers[0].rubble = take(a, 'pebble-sprite');
+    a.barriers[2].rubble = take(a, 'geode-crawler');
+    a.barriers[3].rubble = take(a, 'basalt-sentinel');
+    a.gy.push(take(a, 'excavation'), take(a, 'quarry-worker'));
+    giveHand(a, 'crag-behemoth'); giveHand(a, 'excavation');
+
+    b.monsters.push({ inst: take(b, 'mantis'), at: 1 });
+    b.monsters.push({ inst: take(b, 'beetle-defender'), at: 3 });
+    b.monsters.push({ inst: b.extra.pop(), at: 5 });
+    b.actions[0] = { inst: take(b, 'swarm-frenzy'), faceDown: true };
+    b.barriers[1].faceDown = true;
+    b.gy.push(take(b, 'larva'), take(b, 'forage'));
+    a.lp = 4500; b.lp = 5500;
+    S.turn = 6; S.active = 0; S.phase = 2;
+    S.log = [];
+    log('Demo: Bedrock Golems vs Hive Queen — turn 6. Rubble sits on your Barrier Zones: Excavate it, or tribute it for Charge.');
+  }
+  let demoIndex = 0;
+  const DEMOS = [() => demoBoard(), () => demoGolem()];
 
   // ───────────────────────── Dialogs ─────────────────────────
   function newDuelDialog() {
@@ -489,8 +556,8 @@
     if (!m || m.type !== 'attack' || pi === m.pi) return false;
     const o = P(pi);
     if (kind === 'mon') return true;
-    if (kind === 'bar') return !o.barriers[ref].faceDown;
-    if (kind === 'direct') return o.barriers.every(b => b.faceDown);
+    if (kind === 'bar') return !o.barriers[ref].faceDown || !!o.barriers[ref].rubble;
+    if (kind === 'direct') return o.barriers.every(b => b.faceDown && !b.rubble);
     return false;
   };
 
@@ -519,14 +586,14 @@
     if (S.mode?.uid === inst.uid) cls.push('acting');
     if (S.drag === inst.uid) cls.push('drag-src');
     if (where === 'mon' && P(pi).attacked.has(inst.uid)) cls.push('spent');
-    if (['hand', 'mon', 'act', 'boss'].includes(where)) cls.push('draggable');
+    if (['hand', 'mon', 'act', 'boss', 'rubble'].includes(where)) cls.push('draggable');
     const live = MC.isMonster(inst.card) && where === 'mon' ? charge(inst, pi) : null;
     return MC.renderMini(inst.card, {
       faceDown, back, mods: inst.mods, infected: inst.infected,
       charge: live != null && live !== (inst.card.charge ?? 0) ? live : null,
       extraClass: cls.join(' '),
       attrs: `data-uid="${inst.uid}"`,
-      label: faceDown && where === 'act' ? 'SET' : '',
+      label: faceDown && where === 'act' ? 'SET' : where === 'rubble' ? 'RUBBLE' : '',
     });
   }
 
@@ -573,8 +640,12 @@
       mrow += `<div class="placed" style="grid-column:${col(at + cardOffset(n))}">${miniFor(pi, inst, { where: 'mon' })}</div>`;
     });
 
-    const bar = i => zone(`z-bar ${isTarget(pi, 'bar', i) ? 'target' : ''}`, `data-bar="${i}" data-pi="${pi}"`,
-      miniFor(pi, p.barriers[i].inst, { faceDown: p.barriers[i].faceDown, where: 'bar', back: 'barrier' }), 'Barrier');
+    const bar = i => {
+      const b = p.barriers[i];
+      const under = miniFor(pi, b.inst, { faceDown: b.faceDown, where: 'bar', back: 'barrier', extra: b.rubble ? 'under-rubble' : '' });
+      const top = b.rubble ? miniFor(pi, b.rubble, { where: 'rubble', extra: 'rubble' }) : '';
+      return zone(`z-bar ${b.rubble ? 'has-rubble' : ''} ${isTarget(pi, 'bar', i) ? 'target' : ''}`, `data-bar="${i}" data-pi="${pi}"`, under + top, 'Barrier');
+    };
     const act = i => {
       const valid = placing && m.zone === 'act' && !p.actions[i];
       return zone(`z-act ${valid ? 'valid' : ''} ${myHints?.act.has(i) ? 'drop-ok' : ''}`, `data-act="${i}" data-pi="${pi}"`,
@@ -603,7 +674,7 @@
   function plateHTML(pi) {
     const p = P(pi);
     const direct = isTarget(pi, 'direct');
-    const up = p.barriers.filter(b => !b.faceDown).length;
+    const up = p.barriers.filter(b => !b.faceDown || b.rubble).length;
     return `<div class="box plate ${S.active === pi ? 'is-active' : ''} ${direct ? 'target' : ''}" data-plate="${pi}">
       <span class="box-tab">${MC.esc(p.name)}${S.active === pi ? ' ▸' : ''}</span>
       <div class="plate-deck">${MC.esc(MC.DECKS[p.deckKey].name)}</div>
@@ -642,7 +713,7 @@
       const total = paidSoFar();
       title = m.label;
       body = `Pay <b>${m.cost}</b> Charge — selected <b class="${total >= m.cost ? 'ok' : ''}">${total}</b>.
-        <small>${m.basicOnly ? 'Click Basic monsters to tribute.' : 'Click monsters to tribute or hand cards to discard.'}</small>`;
+        <small>${m.basicOnly ? 'Click Basic monsters or Rubble to tribute.' : 'Click monsters or Rubble to tribute, or hand cards to discard.'}</small>`;
       btns = `<button class="btn btn-hot btn-sm" data-pay-ok ${total >= m.cost ? '' : 'disabled'}>Confirm</button>
         <button class="btn btn-sm" data-cancel>Cancel</button>`;
     } else if (m?.type === 'place') {
@@ -682,12 +753,15 @@
       out.push(`<button class="btn btn-sm btn-hot" data-do="attack" ${why ? `disabled title="${MC.esc(why)}"` : ''}>Attack</button>`);
       out.push(b('destroy', 'Destroy'), b('tribute', 'Tribute'));
       if (c.kind === 'basic' || c.kind === 'tribute') out.push(b('to-hand', 'To hand'));
+      if (c.flags?.rubble) out.push(b('to-rubble', 'Make Rubble'));
       out.push(b('infect', loc.inst.infected ? 'Cure' : 'Infect'));
       out.push(`<span class="mods"><i>ATK</i>${b('atk:-100', '−')}${b('atk:100', '+')}<i>DEF</i>${b('def:-100', '−')}${b('def:100', '+')}<i>CHG</i>${b('charge:-1', '−')}${b('charge:1', '+')}</span>`);
       if (why) out.push(`<p class="hint">${MC.esc(why)}.</p>`);
     } else if (loc.where === 'act') {
       if (loc.slot.faceDown) out.push(b('flip-act', `Activate set (${c.cost} + ${MC.setCostLabel(c)})`, 1));
       out.push(b('resolve', 'Resolve → GY'));
+    } else if (loc.where === 'rubble') {
+      out.push(b('excavate', 'Excavate', 1), b('rubble-gy', 'Send to GY'));
     } else if (loc.where === 'bar') {
       out.push(b('flip', loc.slot.faceDown ? 'Flip face-up' : 'Destroy (flip down)'));
     } else if (loc.where === 'field') {
@@ -821,7 +895,7 @@
       case 'attack':
         S.mode = { type: 'attack', pi: loc.pi, uid: inst.uid }; break;
       case 'destroy':
-        removeMonster(loc.pi, inst.uid, 'is destroyed'); break;
+        removeMonster(loc.pi, inst.uid, 'is destroyed', true); break;
       case 'tribute':
         removeMonster(loc.pi, inst.uid, 'is tributed'); break;
       case 'to-hand':
@@ -842,6 +916,13 @@
         break;
       case 'boss-summon':
         startPlace(loc.pi, inst, 'mon', { note: `${p.name} summons their Boss, ${c.name}!` }); break;
+      case 'excavate':
+        startPlace(loc.pi, inst, 'mon', { note: `${p.name} Excavates ${c.name} from the Rubble!` }); break;
+      case 'rubble-gy':
+        p.gy.push(detach(loc)); log(`${c.name}'s Rubble is sent to the GY.`); S.sel = null; break;
+      case 'to-rubble':
+        if (freeRubbleZone(loc.pi) < 0) { MC.toast('No free Barrier Zone for Rubble'); break; }
+        makeRubble(loc.pi, detach(loc)); break;
     }
     render();
   }
@@ -898,6 +979,7 @@
       const slot = +monZ.dataset.mon;
       if (loc.where === 'hand') { summonFromHand(loc, slot); return; }
       if (loc.where === 'boss') { startPlace(loc.pi, loc.inst, 'mon', { slot, note: `${p.name} summons their Boss, ${c.name}!` }); return; }
+      if (loc.where === 'rubble') { startPlace(loc.pi, loc.inst, 'mon', { slot, note: `${p.name} Excavates ${c.name} from the Rubble!` }); return; }
       if (loc.where === 'mon') {
         const s = startFor(p, fp(c), slot, uid);
         if (s == null) { MC.toast('Not enough room there'); return; }
@@ -947,7 +1029,7 @@
     if ((el = btn('[data-next]'))) { nextPhase(); render(); return; }
     if ((el = btn('[data-draw]'))) { draw(P(S.active)); render(); return; }
     if ((el = btn('[data-newduel]'))) { newDuelDialog(); return; }
-    if ((el = btn('[data-demo]'))) { demoBoard(); render(); return; }
+    if ((el = btn('[data-demo]'))) { demoIndex = (demoIndex + 1) % DEMOS.length; DEMOS[demoIndex](); render(); return; }
     if ((el = btn('[data-pixel]'))) {
       pixel = +el.dataset.pixel;
       try { localStorage.setItem('mc-pixel', pixel); } catch (err) { /* storage blocked */ }

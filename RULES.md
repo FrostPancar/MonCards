@@ -415,6 +415,82 @@ are tagged *Fungus*.
 
 ---
 
+### Bedrock Golem deck (Stone)
+
+**Archetype mechanic — Rubble.** A monster with a **Rubble:** line has two lives:
+
+- When it is **destroyed** (in battle or by an effect), it goes **face-up into one of your
+  Barrier Zones** instead of the GY, on top of the Barrier there. It prefers a zone whose
+  Barrier is already destroyed; if all four zones already hold Rubble, it goes to the GY.
+  Being tributed does *not* make Rubble.
+- While there it is a **Rubble card**. It **counts as a face-up Barrier**, so it blocks
+  direct attacks even after the real Barrier beneath has fallen, and its **Rubble:** effect
+  is active.
+- Attacking a Rubble card **destroys the Rubble** (sent to the GY) and leaves the Barrier
+  beneath untouched.
+- Rubble cards can be **tributed to pay any Charge Cost** (Tribute Summons included).
+- **Excavate** = summon a Rubble card from your Barrier Zone back to a Monster Zone.
+
+The Boss's always-on **Boss Zone** effect is a once-per-turn Excavate, so the deck can
+always recycle its wall back into attackers.
+
+**Boss — Bedrock Titan** — 3500/3500, Footprint 3, Tags: Stone, Golem
+- **Boss Zone:** once per turn, Excavate 1 Rubble card.
+- **Summon:** tribute Rubble cards with a total Charge of 12 or more.
+- **On Summon:** place any number of Stone monsters from your GY in your free Barrier
+  Zones as Rubble.
+- Gains 300 ATK/DEF for each Rubble card you control.
+- When this card would be destroyed, you can send 1 of your Rubble cards to the GY instead.
+
+**Barriers:** 2× **Cairn** (On Destroy: Excavate 1 Rubble card) · 2× **Bedrock Bulwark**
+(Tag Bonus: your Stone monsters gain 300 DEF)
+
+**Field Deck:** Quarry (once per turn, when your Stone monster becomes Rubble: draw 1) ·
+Fault Line (your Rubble cards gain +1 Charge) · Mountain Pass (opponent's monsters must
+attack a Rubble card if able) · Ancient Ruins (once per turn: swap a Rubble card with a
+Stone monster in your hand)
+
+| # | Card | Kind | ATK/DEF | Charge | Cost | Text |
+|---|------|------|---------|--------|------|------|
+| 4 | Pebble Sprite | Basic | 300/300 | 3 | — | Rubble: +2 Charge when tributed from the Barrier Zone |
+| 4 | Cobble Guard | Basic | 1000/1600 | 1 | — | Blocker. Rubble: can redirect attacks on your monsters to this Rubble |
+| 4 | Quarry Worker | Basic | 1200/1000 | 2 | — | On Summon: look at top 3, add a Stone card. Rubble: once per turn, shuffle a hand card back to draw 1 |
+| 4 | Granite Brute | Basic | 1500/1500 | 0 | — | Rubble: your Stone monsters gain 200 DEF |
+| 3 | Geode Crawler | Basic | 800/800 | 2 | — | Rubble: when this Rubble is destroyed by an attack, draw 2 |
+| 3 | Shale Slinger | Basic | 1300/700 | 1 | — | Once per turn: send a Rubble to the GY to destroy a face-up Action. Rubble: attackers lose 300 ATK |
+| 3 | Basalt Sentinel | Tribute | 1800/2400 | 2 | 6 | Blocker. Rubble: once per turn, your other Rubble can't be destroyed by an attack |
+| 3 | Obsidian Edge | Tribute | 2800/1200 | 1 | 7 | Once per turn: when this destroys a monster, Excavate 1. Rubble: a Stone monster gains 500 ATK |
+| 2 | Monolith Warden | Tribute | 2600/3000 | 3 | 10 | Footprint 2. On Summon: Excavate up to 2 Basic Stone monsters. Rubble: only 2000+ ATK attackers can destroy it |
+| 2 | Crag Behemoth | Tribute | 3200/2800 | 4 | 14 | Footprint 2. +300 ATK per Rubble; tribute a Rubble to destroy a card. Rubble: Excavated monsters gain 500 ATK |
+| 4 | Excavation | Action | — | 2 | 1 (set +1) | Excavate 1 Rubble card |
+| 3 | Landslide | Action | — | 2 | 4 (set +2) | Send any number of your Rubble to the GY: destroy that many opponent monsters with ≤1500 DEF |
+| 3 | Reinforce | Action | — | 2 | 0 (set +2) | Move a Stone monster you control to a free Barrier Zone as Rubble |
+| 3 | Petrify | Action | — | 2 | 3 (set +2) | An opponent's monster becomes Stone and can't attack; if destroyed while Stone, it becomes *your* Rubble |
+| 3 | Rockfall | Action | — | 1 | 2 (set +0) | When an opponent's monster attacks your Rubble: destroy the attacker |
+| 2 | Mason's Blueprint | Action | — | 3 | 0 (set ?) | Add a Stone Tribute monster from Deck to hand; you can't Excavate this turn |
+
+22 Basic + 10 Tribute + 18 Action = **50**.
+
+**Extra Deck (2 each, 10 total)**
+
+| Card | ATK/DEF | Footprint | How it's summoned | Effect |
+|------|---------|-----------|-------------------|--------|
+| Rubble Hound | 1400/1000 | 1 | Send 2 Basic Stone monsters from hand/field to the GY | On Summon: Excavate 1 |
+| Gravel Swarm | 1000/1000 | 2 | Pay a Charge Cost of 6 using only Rubble | Can't be destroyed in battle while you control 2+ Rubble |
+| Keystone Golem | 3000/3000 | 2 | When all 4 Barrier Zones hold Rubble, send all of them to the GY | Your opponent can't attack your other monsters |
+| Fossil Wyrm | 2400/2000 | 1 | Shuffle 3 differently-named Stone monsters from your GY into your Deck | Once per turn: banish a GY card to put a Stone monster from GY into a Barrier Zone as Rubble |
+| Gargoyle Sentry | 1800/1800 | 1 | When your Stone monster becomes Rubble, send that Rubble to the GY (either player's turn) | Blocker |
+
+🔶 **Open questions for this deck**
+- "Banish" (Fossil Wyrm) is a new zone the rules don't have yet. Should it stay, or become
+  "shuffle into Deck"?
+- Can Rubble placed on a **face-up** Barrier switch that Barrier's effect off while
+  covered? (The app keeps both active.)
+- Should the 4-copy limit allow 4 Pebble Sprites, given how much Charge they produce from
+  the Barrier Zone (5 each)?
+
+---
+
 ## 11. Glossary
 
 | Term          | Meaning                                                              |
@@ -427,3 +503,6 @@ are tagged *Fungus*.
 | Infected      | A status applied by Fungus effects (shown with a spore icon)          |
 | Blocker       | A card that can redirect an attack to itself                          |
 | Unblockable   | A monster whose attacks Blockers can't redirect                       |
+| Rubble        | A destroyed Stone monster sitting in a Barrier Zone (counts as a face-up Barrier) |
+| Excavate      | Summon a Rubble card from the Barrier Zone back to a Monster Zone     |
+| Boss Zone     | An effect the Boss has while waiting in its Boss Zone                 |

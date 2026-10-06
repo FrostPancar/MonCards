@@ -40,6 +40,8 @@
     Ant:    ['..#...#..', '...#.#...', '...###...', '....#....', '#..###..#', '.#######.', '..#####..', '.#######.', '#..###..#'],
     Fungus: ['...###...', '.#######.', '##.###.##', '#########', '.#######.', '...###...', '...###...', '..#####..', '.........'],
     Undead: ['..#####..', '.#######.', '##..#..##', '##..#..##', '#########', '.###.###.', '..#####..', '..#.#.#..', '.........'],
+    Stone:  ['.........', '...###...', '..#####..', '.##.####.', '.######..', '########.', '#####.###', '.#######.', '.........'],
+    Golem:  ['.#######.', '#########', '##.###.##', '##.###.##', '#########', '#.#####.#', '#.#...#.#', '#.#####.#', '.#######.'],
     Infected: ['....#....', '.#..#..#.', '..#####..', '..##.##..', '###...###', '..##.##..', '..#####..', '.#..#..#.', '....#....'],
     // card-back emblems (9×9)
     main:    ['....#....', '...###...', '..##.##..', '.##...##.', '##..#..##', '.##...##.', '..##.##..', '...###...', '....#....'],
@@ -64,7 +66,7 @@
     return `<span class="pips ${v ? '' : 'pips-zero'} ${cls}" title="Charge ${v}" aria-label="Charge ${v}">${icons}</span>`;
   };
 
-  MC.TAG_COLORS = { Insect: '#3aa63a', Ant: '#e2582a', Fungus: '#d03aa8', Undead: '#7a6c94', Infected: '#d03aa8' };
+  MC.TAG_COLORS = { Insect: '#3aa63a', Ant: '#e2582a', Fungus: '#d03aa8', Undead: '#7a6c94', Infected: '#d03aa8', Stone: '#8a7a66', Golem: '#5f6f86' };
   /** Tag chip: icon only, the name slides out on hover. */
   MC.tagChip = t =>
     `<span class="tag" title="${MC.esc(t)}" style="--tc:${MC.TAG_COLORS[t] || '#555'}">${MC.icon(t)}<span class="tag-name">${MC.esc(t)}</span></span>`;
@@ -73,7 +75,7 @@
     `<span class="tag tag-fp" title="Footprint ${n}: blocks ${n - 1} neighbouring zone${n > 2 ? 's' : ''}">${MC.icon('foot')}<b>${n}</b></span>`;
 
   // Keywords that open an effect line ("SUMMON:" style in the reference UI).
-  const KEYWORDS = ['Once per turn', 'On Summon', 'On Destroy', 'On Tribute', 'Blocker', 'Unblockable', 'Summon'];
+  const KEYWORDS = ['Once per turn', 'On Summon', 'On Destroy', 'On Tribute', 'Blocker', 'Unblockable', 'Summon', 'Rubble', 'Excavate', 'Boss Zone'];
   const KW_RE = new RegExp(`^(${KEYWORDS.join('|')})([:.])\\s*`, 'i');
   const byName = () => (MC._byName ||= Object.fromEntries(MC.CARDS.map(c => [c.name.toLowerCase(), c])));
   /** Escape text, turning "Card Name" references into pills in that card's type colour. */
@@ -254,7 +256,7 @@
   const KW_COLORS = {
     'once-per-turn': ['#5a7cf0', '#9a5ee6'], 'on-summon': ['#2fa84a', '#26b8a6'],
     'on-destroy': ['#e8384c', '#f08a2a'], 'on-tribute': ['#e0a81e', '#f08a2a'],
-    'summon': ['#8a4ad8', '#e04cb8'], 'blocker': ['#2f6be0', '#26b8a6'], 'unblockable': ['#f08a2a', '#e0b81e'],
+    'summon': ['#8a4ad8', '#e04cb8'], 'rubble': ['#7a6a56', '#a8987c'], 'excavate': ['#a0702e', '#d8a03a'], 'boss-zone': ['#6a3ab8', '#b06ae8'], 'blocker': ['#2f6be0', '#26b8a6'], 'unblockable': ['#f08a2a', '#e0b81e'],
   };
   (function injectDitherCSS() {
     const css = [];
@@ -271,9 +273,14 @@
     document.head.insertAdjacentHTML('beforeend', `<style id="mc-dither">${css.join('')}</style>`);
   })();
 
+  /** The tag that best identifies a card (sub-tags like Ant / Golem win over Insect / Stone). */
+  MC.mainTag = card => {
+    const t = card.tags || [];
+    return ['Golem', 'Ant'].find(x => t.includes(x)) || t[0];
+  };
   /** Icon used as a card's art while sprites are hidden: main tag for monsters, a type icon otherwise. */
   MC.artIcon = card => {
-    if (MC.isMonster(card)) return (card.tags || [])[card.tags?.includes('Ant') ? card.tags.indexOf('Ant') : 0] || 'Insect';
+    if (MC.isMonster(card)) return MC.mainTag(card) || 'Insect';
     return { action: 'action', field: 'field', barrier: 'barrier' }[card.kind];
   };
   /** Art content: the sprite (when enabled, monsters only) or the outlined icon art. */
@@ -394,7 +401,7 @@
     const ch = opts.charge ?? card.charge;
     const boosted = opts.charge != null && opts.charge !== card.charge;
     const charge = ch != null ? MC.chargePips(ch, `m-charge ${boosted ? 'up' : ''}`) : '';
-    const tag = (card.tags || [])[card.tags?.includes('Ant') ? card.tags.indexOf('Ant') : 0];
+    const tag = MC.mainTag(card);
     return `<div class="mini k-${card.kind} ${opts.extraClass || ''}" ${opts.attrs || ''}>
       <div class="m-name">${MC.esc(card.name)}</div>
       <div class="m-art ${MC.SHOW_ART && MC.isMonster(card) ? '' : 'no-art'}">${MC.artHTML(card)}${charge}

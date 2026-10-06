@@ -180,6 +180,109 @@ MC.CARDS = [
     text: 'On Destroy: summon 1 "Insect Shell".' },
   { id: 'moldy-shield', name: 'Moldy Shield', kind: 'barrier', archetype: 'On Destroy', onBreak: 'infectAttacker',
     text: 'On Destroy: Infect the attacking monster.' },
+  // ═════════════════════ Bedrock Golem deck (Stone) ═════════════════════
+  // Rubble: a destroyed Stone monster with a "Rubble:" line goes to a free Barrier Zone
+  // instead of the GY. There it counts as a face-up Barrier and its Rubble effect is live.
+  // Rubble can be tributed to pay Charge costs. Excavate = summon a Rubble card back.
+
+  // Boss
+  {
+    id: 'bedrock-titan', name: 'Bedrock Titan', kind: 'boss',
+    atk: 3500, def: 3500, footprint: 3, tags: ['Stone', 'Golem'],
+    text:
+      'Boss Zone: once per turn, Excavate 1 Rubble card.\n' +
+      'Summon: tribute Rubble cards with a total Charge of 12 or more.\n' +
+      'On Summon: place any number of Stone monsters from your GY in your free Barrier Zones as Rubble.\n' +
+      'Gains 300 ATK/DEF for each Rubble card you control.\n' +
+      'When this card would be destroyed, you can send 1 of your Rubble cards to the GY instead.',
+  },
+
+  // Basics
+  { id: 'pebble-sprite', name: 'Pebble Sprite', kind: 'basic',
+    atk: 300, def: 300, charge: 3, tags: ['Stone'], flags: { rubble: true }, chargeBonus: { rubble: 2 },
+    text: 'Rubble: +2 Charge when tributed from the Barrier Zone.' },
+  { id: 'cobble-guard', name: 'Cobble Guard', kind: 'basic',
+    atk: 1000, def: 1600, charge: 1, tags: ['Stone', 'Golem'], keywords: ['Blocker'], flags: { blocker: true, rubble: true },
+    text: 'Blocker.\nRubble: when an opponent\'s monster attacks your monster, you can redirect the attack to this Rubble.' },
+  { id: 'quarry-worker', name: 'Quarry Worker', kind: 'basic',
+    atk: 1200, def: 1000, charge: 2, tags: ['Stone'], flags: { rubble: true },
+    text: 'On Summon: look at the top 3 cards of your Deck, add 1 Stone card among them to your hand and put the rest on the bottom.\nRubble: once per turn, shuffle 1 card from your hand into your Deck to draw 1.' },
+  { id: 'granite-brute', name: 'Granite Brute', kind: 'basic',
+    atk: 1500, def: 1500, charge: 0, tags: ['Stone', 'Golem'], flags: { rubble: true },
+    text: 'Rubble: your Stone monsters gain 200 DEF.' },
+  { id: 'geode-crawler', name: 'Geode Crawler', kind: 'basic',
+    atk: 800, def: 800, charge: 2, tags: ['Stone'], flags: { rubble: true },
+    text: 'Rubble: when this Rubble is destroyed by an attack, draw 2.' },
+  { id: 'shale-slinger', name: 'Shale Slinger', kind: 'basic',
+    atk: 1300, def: 700, charge: 1, tags: ['Stone'], flags: { rubble: true },
+    text: 'Once per turn: send 1 of your Rubble cards to the GY to destroy 1 face-up Action card.\nRubble: monsters that attack this Rubble lose 300 ATK until end of turn.' },
+
+  // Tributes
+  { id: 'basalt-sentinel', name: 'Basalt Sentinel', kind: 'tribute',
+    atk: 1800, def: 2400, charge: 2, cost: 6, footprint: 1, tags: ['Stone', 'Golem'], keywords: ['Blocker'], flags: { blocker: true, rubble: true },
+    text: 'Blocker.\nRubble: once per turn, your other Rubble cards can\'t be destroyed by an attack.' },
+  { id: 'obsidian-edge', name: 'Obsidian Edge', kind: 'tribute',
+    atk: 2800, def: 1200, charge: 1, cost: 7, footprint: 1, tags: ['Stone'], flags: { rubble: true },
+    text: 'Once per turn: when this card destroys a monster, Excavate 1 Rubble card.\nRubble: once per turn, 1 Stone monster you control gains 500 ATK until end of turn.' },
+  { id: 'monolith-warden', name: 'Monolith Warden', kind: 'tribute',
+    atk: 2600, def: 3000, charge: 3, cost: 10, footprint: 2, tags: ['Stone', 'Golem'], flags: { rubble: true },
+    text: 'On Summon: Excavate up to 2 Basic Stone monsters.\nRubble: an attack only destroys this Rubble if the attacker has 2000 or more ATK.' },
+  { id: 'crag-behemoth', name: 'Crag Behemoth', kind: 'tribute',
+    atk: 3200, def: 2800, charge: 4, cost: 14, footprint: 2, tags: ['Stone', 'Golem'], flags: { rubble: true },
+    text: 'Gains 300 ATK for each Rubble card you control.\nOnce per turn: tribute 1 of your Rubble cards to destroy 1 card on the field.\nRubble: your Excavated monsters gain 500 ATK.' },
+
+  // Actions
+  { id: 'excavation', name: 'Excavation', kind: 'action',
+    charge: 2, cost: 1, setCost: 1, tags: ['Stone'],
+    text: 'Excavate 1 Rubble card.' },
+  { id: 'landslide', name: 'Landslide', kind: 'action',
+    charge: 2, cost: 4, setCost: 2, tags: ['Stone'],
+    text: 'Send any number of your Rubble cards to the GY: destroy that many of your opponent\'s monsters with 1500 or less DEF.' },
+  { id: 'reinforce', name: 'Reinforce', kind: 'action',
+    charge: 2, cost: 0, setCost: 2, tags: ['Stone'],
+    text: 'Move 1 Stone monster you control to a free Barrier Zone as Rubble.' },
+  { id: 'petrify', name: 'Petrify', kind: 'action',
+    charge: 2, cost: 3, setCost: 2, tags: ['Stone'],
+    text: 'Target 1 of your opponent\'s monsters: it gains the Stone tag and can\'t attack until the end of their next turn. If it is destroyed while Stone, place it in your Barrier Zone as Rubble.' },
+  { id: 'rockfall', name: 'Rockfall', kind: 'action',
+    charge: 1, cost: 2, setCost: 0, tags: ['Stone'],
+    text: 'When an opponent\'s monster attacks one of your Rubble cards: destroy the attacking monster.' },
+  { id: 'masons-blueprint', name: 'Mason\'s Blueprint', kind: 'action',
+    charge: 3, cost: 0, setCost: null, tags: ['Stone'],
+    text: 'Add 1 Stone Tribute monster from your Deck to your hand. You can\'t Excavate this turn.' },
+
+  // Extra Deck
+  { id: 'rubble-hound', name: 'Rubble Hound', kind: 'extra', method: 'formation',
+    atk: 1400, def: 1000, footprint: 1, tags: ['Stone'],
+    text: 'Summon: send 2 Basic Stone monsters from your hand or field to the GY.\nOn Summon: Excavate 1 Rubble card.' },
+  { id: 'gravel-swarm', name: 'Gravel Swarm', kind: 'extra', method: 'charge',
+    atk: 1000, def: 1000, footprint: 2, tags: ['Stone'],
+    text: 'Summon: pay a Charge Cost of 6 using only Rubble cards.\nCan\'t be destroyed in battle while you control 2 or more Rubble cards.' },
+  { id: 'keystone-golem', name: 'Keystone Golem', kind: 'extra', method: 'special',
+    atk: 3000, def: 3000, footprint: 2, tags: ['Stone', 'Golem'],
+    text: 'Summon: when all 4 of your Barrier Zones hold Rubble, send all of them to the GY.\nYour opponent can\'t attack your other monsters.' },
+  { id: 'fossil-wyrm', name: 'Fossil Wyrm', kind: 'extra', method: 'special',
+    atk: 2400, def: 2000, footprint: 1, tags: ['Stone'],
+    text: 'Summon: shuffle 3 Stone monsters with different names from your GY into your Deck.\nOnce per turn: banish 1 card in your GY to place 1 Stone monster from your GY in a free Barrier Zone as Rubble.' },
+  { id: 'gargoyle-sentry', name: 'Gargoyle Sentry', kind: 'extra', method: 'special',
+    atk: 1800, def: 1800, footprint: 1, tags: ['Stone', 'Golem'], keywords: ['Blocker'], flags: { blocker: true },
+    text: 'Summon: when one of your Stone monsters becomes Rubble, send that Rubble to the GY (this works on either player\'s turn).\nBlocker.' },
+
+  // Field
+  { id: 'quarry', name: 'Quarry', kind: 'field',
+    text: 'Once per turn: when one of your Stone monsters becomes Rubble, draw 1.' },
+  { id: 'fault-line', name: 'Fault Line', kind: 'field',
+    text: 'Your Rubble cards gain +1 Charge.' },
+  { id: 'mountain-pass', name: 'Mountain Pass', kind: 'field',
+    text: 'If able, your opponent\'s monsters must attack a Rubble card.' },
+  { id: 'ancient-ruins', name: 'Ancient Ruins', kind: 'field',
+    text: 'Once per turn: swap 1 of your Rubble cards with a Stone monster in your hand.' },
+
+  // Barriers
+  { id: 'cairn', name: 'Cairn', kind: 'barrier', archetype: 'On Destroy',
+    text: 'On Destroy: Excavate 1 Rubble card.' },
+  { id: 'bedrock-bulwark', name: 'Bedrock Bulwark', kind: 'barrier', archetype: 'Tag Bonus', tags: ['Stone'],
+    text: 'While face-up: your Stone monsters gain 300 DEF.' },
 ];
 
 MC.DECKS = {
@@ -207,6 +310,19 @@ MC.DECKS = {
       ['spore-cloud', 4], ['rot', 4], ['hivemind-veto', 2], ['puppet-strings', 2], ['fungal-mending', 2], ['total-bloom', 2],
     ],
     extra: [['insect-shell', 10]],
+    side: [],
+  },
+  golem: {
+    name: 'Bedrock Golems',
+    boss: 'bedrock-titan',
+    barriers: ['cairn', 'cairn', 'bedrock-bulwark', 'bedrock-bulwark'],
+    field: ['quarry', 'fault-line', 'mountain-pass', 'ancient-ruins'],
+    main: [
+      ['pebble-sprite', 4], ['cobble-guard', 4], ['quarry-worker', 4], ['granite-brute', 4], ['geode-crawler', 3], ['shale-slinger', 3],
+      ['basalt-sentinel', 3], ['obsidian-edge', 3], ['monolith-warden', 2], ['crag-behemoth', 2],
+      ['excavation', 4], ['landslide', 3], ['reinforce', 3], ['petrify', 3], ['rockfall', 3], ['masons-blueprint', 2],
+    ],
+    extra: [['rubble-hound', 2], ['gravel-swarm', 2], ['keystone-golem', 2], ['fossil-wyrm', 2], ['gargoyle-sentry', 2]],
     side: [],
   },
 };
