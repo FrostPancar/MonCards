@@ -59,7 +59,12 @@ Each player has the following zones:
 | Barrier Zones     | 4     | Your 4 Barrier cards                                       |
 | Boss Zone         | 1     | Your Boss Monster while it is not on the field             |
 
-Off-board piles: **Deck**, **Extra Deck**, **Field Deck**, **Graveyard (GY)**.
+Off-board piles: **Deck**, **Extra Deck**, **Field Deck**, **Graveyard (GY)** and **Extra
+Graveyard (Extra GY)**.
+
+Pile layout: the **Extra Deck** sits on the left of the board with the **Extra GY** in front
+of it, and the **Deck** sits on the right with the **GY** in front of it (mirrored for the
+opponent).
 
 The Boss Zone and Field Zone sit on pads **beside** the main board: Player 1 has the Boss
 on the left and the Field on the right, Player 2 is mirrored.
@@ -173,8 +178,8 @@ Every card has a **frame color** that tells you its type at a glance.
 - 🔶 **Open question:** for Formation style, does the Extra Deck monster sit on top of the
   flipped-down materials (covering exactly those zones), and what happens to the
   materials when it leaves the field?
-- 🔶 **Open question:** destroyed Extra Deck monsters go to the GY (assumed) or back to
-  the Extra Deck?
+- Extra Deck monsters that leave the field go to the **Extra GY**, a separate graveyard
+  next to the Extra Deck.
 
 ### 6.4 Action Cards
 

@@ -26,6 +26,7 @@
       name, deckKey, lp: 6000,
       deck: shuffle(MC.expand(d.main).map(mk)),
       hand: [], gy: [],
+      exgy: [],                             // Extra Deck graveyard
       extra: MC.expand(d.extra).map(mk),
       fieldDeck: d.field.map(mk),
       monsters: [],                         // { inst, at } — `at` is the leftmost zone covered
@@ -117,6 +118,7 @@
       if (p.field && p.field.inst.uid === uid) return { pi, where: 'field', inst: p.field.inst, slot: p.field };
       if (p.boss && p.boss.uid === uid) return { pi, where: 'boss', inst: p.boss };
       if ((i = p.gy.findIndex(x => x.uid === uid)) > -1) return { pi, where: 'gy', i, inst: p.gy[i] };
+      if ((i = p.exgy.findIndex(x => x.uid === uid)) > -1) return { pi, where: 'exgy', i, inst: p.exgy[i] };
       if ((i = p.extra.findIndex(x => x.uid === uid)) > -1) return { pi, where: 'extra', i, inst: p.extra[i] };
       if ((i = p.fieldDeck.findIndex(x => x.uid === uid)) > -1) return { pi, where: 'fdeck', i, inst: p.fieldDeck[i] };
       if ((i = p.deck.findIndex(x => x.uid === uid)) > -1) return { pi, where: 'deck', i, inst: p.deck[i] };
@@ -134,6 +136,7 @@
       case 'mon': p.monsters.splice(loc.i, 1); break;
       case 'act': p.actions[loc.i] = null; break;
       case 'gy': p.gy.splice(loc.i, 1); break;
+      case 'exgy': p.exgy.splice(loc.i, 1); break;
       case 'extra': p.extra.splice(loc.i, 1); break;
       case 'deck': p.deck.splice(loc.i, 1); break;
       case 'boss': p.boss = null; break;
@@ -145,7 +148,9 @@
   /** Send a card to its resting place: Bosses go home, everything else to the GY. */
   function bury(pi, inst) {
     reset(inst);
-    if (inst.card.kind === 'boss') P(pi).boss = inst; else P(pi).gy.push(inst);
+    if (inst.card.kind === 'boss') P(pi).boss = inst;
+    else if (inst.card.kind === 'extra') P(pi).exgy.push(inst); // Extra Deck monsters have their own graveyard
+    else P(pi).gy.push(inst);
   }
 
   /**
@@ -511,10 +516,11 @@
 
   function pileDialog(pi, which) {
     const p = P(pi);
-    const list = { gy: p.gy, extra: p.extra, deck: p.deck, fdeck: p.fieldDeck }[which];
-    const title = { gy: 'Graveyard', extra: 'Extra Deck', deck: 'Deck', fdeck: 'Field Deck' }[which];
+    const list = { gy: p.gy, exgy: p.exgy, extra: p.extra, deck: p.deck, fdeck: p.fieldDeck }[which];
+    const title = { gy: 'Graveyard', exgy: 'Extra Graveyard', extra: 'Extra Deck', deck: 'Deck', fdeck: 'Field Deck' }[which];
     const btns = inst => {
       if (which === 'gy' || which === 'deck') return `<button class="btn" data-pile="hand" data-uid="${inst.uid}">To hand</button>`;
+      if (which === 'exgy') return `<button class="btn" data-pile="toextra" data-uid="${inst.uid}">To Extra Deck</button>`;
       if (which === 'extra') return `<button class="btn btn-hot" data-pile="summon" data-uid="${inst.uid}">Summon</button>`;
       if (which === 'fdeck') return `<button class="btn" data-pile="swap" data-uid="${inst.uid}">Swap in</button>`;
       return '';
@@ -535,6 +541,9 @@
         p.hand.push(detach(loc));
         log(`${p.name} adds ${loc.inst.card.name} to hand from the ${title}.`);
         if (which === 'deck') shuffle(p.deck);
+      } else if (act === 'toextra') {
+        p.extra.push(detach(loc));
+        log(`${loc.inst.card.name} returns to ${p.name}'s Extra Deck.`);
       } else if (act === 'summon') {
         if (S.turn === 1) { MC.toast('No Extra Deck summons on turn 1'); return; }
         MC.closeModal();
@@ -567,7 +576,7 @@
     if (!d) return null;
     const c = d.inst.card, p = P(d.pi);
     const mainKind = ['basic', 'tribute', 'action'].includes(c.kind);
-    const h = { pi: d.pi, mon: new Set(), act: new Set(), gy: d.where !== 'boss', deck: mainKind, hand: d.where !== 'hand' && mainKind };
+    const h = { pi: d.pi, mon: new Set(), act: new Set(), gy: d.where !== 'boss' && c.kind !== 'extra', exgy: c.kind === 'extra', deck: mainKind, hand: d.where !== 'hand' && mainKind };
     if (MC.isMonster(c) && (d.where !== 'hand' || ['basic', 'tribute'].includes(c.kind))) {
       h.mon = cardZones(p, fp(c), d.inst.uid);
     }
@@ -652,8 +661,11 @@
         p.actions[i] ? miniFor(pi, p.actions[i].inst, { faceDown: p.actions[i].faceDown, where: 'act' }) : '', 'Action');
     };
 
-    let front = [`<div class="mrow">${mrow}</div>`, pile(pi, 'gy', p.gy, 'GY', true, myHints?.gy), pile(pi, 'extra', p.extra, 'Extra')];
-    let back = [bar(0), bar(1), act(0), act(1), act(2), bar(2), bar(3), pile(pi, 'deck', p.deck, 'Deck', false, myHints?.deck)];
+    // Extra Deck side (left for Player 1) and Deck side (right), each with its graveyard in front.
+    const mid = [bar(0), bar(1), act(0), act(1), act(2), bar(2), bar(3)];
+    if (mirror) mid.reverse();
+    let front = [pile(pi, 'exgy', p.exgy, 'Ex GY', true, myHints?.exgy), `<div class="mrow">${mrow}</div>`, pile(pi, 'gy', p.gy, 'GY', true, myHints?.gy)];
+    let back = [pile(pi, 'extra', p.extra, 'Extra'), `<div class="brow">${mid.join('')}</div>`, pile(pi, 'deck', p.deck, 'Deck', false, myHints?.deck)];
     if (mirror) { front = front.reverse(); back = back.reverse(); }
     const rows = [`<div class="row">${front.join('')}</div>`, `<div class="row">${back.join('')}</div>`];
     if (mirror) rows.reverse();
@@ -1002,9 +1014,9 @@
     }
     if (pileZ && same(pileZ)) {
       const which = pileZ.dataset.pilezone;
-      if (which === 'gy' && loc.where !== 'boss') {
+      if ((which === 'gy' || which === 'exgy') && loc.where !== 'boss') {
         if (loc.where === 'mon') { removeMonster(loc.pi, uid, 'is sent to the GY'); return; }
-        p.gy.push(reset(detach(loc))); log(`${c.name} is sent to the GY.`); S.sel = null; return;
+        bury(loc.pi, detach(loc)); log(`${c.name} is sent to the ${c.kind === 'extra' ? 'Extra GY' : 'GY'}.`); S.sel = null; return;
       }
       if (which === 'deck' && ['basic', 'tribute', 'action'].includes(c.kind)) {
         p.deck.push(reset(detach(loc))); shuffle(p.deck); log(`${c.name} is shuffled into ${p.name}'s Deck.`); S.sel = null; return;

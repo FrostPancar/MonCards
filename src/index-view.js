@@ -4,7 +4,8 @@
   const state = { q: '', kind: 'all', deck: 'all', tag: 'all' };
   let root;
 
-  const allTags = [...new Set(MC.CARDS.flatMap(c => [...(c.tags || []), ...(c.keywords || [])]))].sort();
+  const allTags = () => [...new Set(MC.CARDS.flatMap(c => [...(c.tags || []), ...(c.keywords || [])]))].sort();
+  const refresh = () => { renderFilters(); renderGrid(); };
 
   function deckSections(deck) {
     return [
@@ -31,6 +32,7 @@
     return `<button class="card-cell" data-open="${card.id}">
       ${MC.renderCard(card)}
       ${count ? `<span class="count-badge">×${count}</span>` : ''}
+      ${card.custom ? '<span class="custom-badge">Custom</span>' : ''}
     </button>`;
   }
 
@@ -95,6 +97,7 @@
         <h2>${MC.esc(c.name)}</h2>
         <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v?.html ?? MC.esc(v)}</dd>`).join('')}</dl>
         ${inDecks ? `<h4>In decks</h4><ul class="in-decks">${inDecks}</ul>` : ''}
+        <button class="btn" data-edit="${c.id}">${c.custom ? 'Edit in creator' : 'Copy into creator'}</button>
       </div></div>`, { wide: true });
   }
 
@@ -115,25 +118,29 @@
         </select></label>
         <label>Tag <select data-sel="tag">
           <option value="all">Any tag</option>
-          ${allTags.map(t => `<option ${state.tag === t ? 'selected' : ''}>${MC.esc(t)}</option>`).join('')}
+          ${allTags().map(t => `<option ${state.tag === t ? 'selected' : ''}>${MC.esc(t)}</option>`).join('')}
         </select></label>
-      </div>`;
+      </div>
+      <button class="btn btn-hot" data-create>+ Card Creator</button>`;
   }
 
   MC.IndexView = {
     mount(el) {
       root = el;
       root.innerHTML = `<div class="index-wrap">
-        <div class="index-head">
-          <h1>Card Index</h1>
-          <p class="lede">Every card in the pool. Pick a deck to see its list and legality check.</p>
-        </div>
         <div class="filters box"></div>
         <div class="index-body"></div>
       </div>`;
       renderFilters(); renderGrid();
       root.addEventListener('input', e => {
         if (e.target.matches('.search')) { state.q = e.target.value; renderGrid(); }
+      });
+      document.getElementById('modal').addEventListener('click', e => {
+        const ed = e.target.closest('[data-edit]');
+        if (!ed) return;
+        const card = MC.byId[ed.dataset.edit];
+        MC.closeModal();
+        MC.Creator.open(card.custom ? card : { ...card, name: card.name + ' Copy' }, refresh);
       });
       root.addEventListener('change', e => {
         const s = e.target.dataset.sel;
@@ -154,6 +161,7 @@
       root.addEventListener('click', e => {
         const k = e.target.closest('[data-kind]');
         if (k) { state.kind = k.dataset.kind; renderFilters(); renderGrid(); return; }
+        if (e.target.closest('[data-create]')) { MC.Creator.open(null, refresh); return; }
         const o = e.target.closest('[data-open]');
         if (o) openCard(o.dataset.open);
       });

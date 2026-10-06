@@ -268,7 +268,8 @@ h1, h2, h3, h4 { font-family: var(--f-body); font-weight: 700; margin: 0; }
 .index-wrap { max-width: 1280px; margin: 0 auto; padding: 28px 20px 80px; }
 .index-head h1 { font-size: 36px; }
 .lede { color: var(--ink-2); margin: 6px 0 18px; }
-.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 26px; position: sticky; top: 70px; z-index: 5; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 26px; }
+.filters [data-create] { margin-left: auto; }
 .search, select {
   font-family: var(--f-body); font-size: 18px; color: var(--ink);
   background: #fff; border: 3px solid var(--ink); border-radius: 8px; padding: 4px 10px;
@@ -292,6 +293,11 @@ h1, h2, h3, h4 { font-family: var(--f-body); font-weight: 700; margin: 0; }
 .card-cell {
   position: relative; background: none; border: 0; padding: 0; cursor: pointer;
   transition: transform .12s ease-out; will-change: transform;
+}
+.custom-badge {
+  position: absolute; top: -10px; left: -6px; z-index: 2;
+  font-family: var(--f-pixel); font-weight: 700; font-size: 10px; text-transform: uppercase;
+  background: var(--yellow); color: var(--ink); padding: 3px 6px; border: 3px solid var(--ink); border-radius: 8px;
 }
 .count-badge {
   position: absolute; top: -10px; right: -10px; z-index: 2;
@@ -465,8 +471,10 @@ h1, h2, h3, h4 { font-family: var(--f-body); font-weight: 700; margin: 0; }
 /* Lift board content off the table plane so hit-testing reaches it, not the 3D parent. */
 .side, .midline { transform: translateZ(1px); }
 .side { display: flex; flex-direction: column; gap: var(--gap); }
-.row { display: grid; grid-template-columns: repeat(8, var(--zw)); gap: var(--gap); }
-.mrow { grid-column: span 6; display: grid; grid-template-columns: repeat(6, var(--zw)); gap: var(--gap); }
+/* each row: [pile] [middle: 7 zone widths] [pile]; the 6 monster zones sit centred in the middle */
+.row { display: grid; grid-template-columns: var(--zw) calc(7 * var(--zw) + 6 * var(--gap)) var(--zw); gap: var(--gap); }
+.mrow { justify-self: center; display: grid; grid-template-columns: repeat(6, var(--zw)); gap: var(--gap); }
+.brow { display: grid; grid-template-columns: repeat(7, var(--zw)); gap: var(--gap); }
 .mrow > * { grid-row: 1; }
 
 .zone {
@@ -665,7 +673,6 @@ h1, h2, h3, h4 { font-family: var(--f-body); font-weight: 700; margin: 0; }
   .logo { font-size: 20px; }
   .tabs a { font-size: 14px; padding: 5px 8px; }
   .index-wrap { padding: 18px 16px 60px; }
-  .filters { top: 60px; }
   .card-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 22px 10px; }
   .card-grid .card { --cw: 152px; }
   .table-layout { padding: 10px 16px; }
@@ -679,9 +686,37 @@ h1, h2, h3, h4 { font-family: var(--f-body); font-weight: 700; margin: 0; }
   .hud { grid-template-columns: 1fr; }
   .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .card-grid .card { --cw: min(152px, 41vw); }
-  .filters { position: static; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 .mini.rubble .mini-flag { bottom: auto; top: -11px; background: #e8dcc4; }
+
+/* ───────── card creator ───────── */
+.creator { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: start; }
+.cc-form { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cc-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.cc-row > .cc-field { flex: 1 1 90px; }
+.cc-field { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 15px; }
+.cc-field[hidden] { display: none !important; }
+.cc-field input, .cc-field select, .cc-field textarea, .cc-tags input[name=moreTags] {
+  font-family: var(--f-body); font-size: 17px; color: var(--ink); width: 100%;
+  background: #fff; border: 3px solid var(--ink); border-radius: 8px; padding: 5px 9px;
+}
+.cc-field textarea { resize: vertical; line-height: 1.25; }
+.cc-field input:focus, .cc-field select:focus, .cc-field textarea:focus, .cc-tags input:focus { outline: 3px solid var(--blue); outline-offset: 1px; }
+.cc-tags { border: 3px solid var(--ink); border-radius: 10px; padding: 8px 10px 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
+.cc-tags legend { font-weight: 600; font-size: 15px; padding: 0 4px; }
+.cc-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 15px; cursor: pointer; }
+.cc-tag .tag { font-size: 14px; }
+.cc-tags input[name=moreTags] { flex: 1 1 100%; }
+.cc-help { font-size: 14px; color: var(--ink-2); margin: 0; line-height: 1.35; }
+.cc-preview { position: sticky; top: 0; display: flex; flex-direction: column; align-items: center; gap: 14px; width: 300px; }
+.cc-preview .card-xl { --cw: 260px; }
+.cc-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.cc-code { width: 100%; font-family: monospace; font-size: 12px; border: 3px solid var(--ink); border-radius: 8px; padding: 6px; }
+.cc-note { font-size: 13px; color: var(--ink-2); margin: 0; text-align: center; }
+@media (max-width: 760px) {
+  .creator { grid-template-columns: 1fr; }
+  .cc-preview { position: static; width: 100%; }
+}
