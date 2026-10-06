@@ -61,6 +61,9 @@ Each player has the following zones:
 
 Off-board piles: **Deck**, **Extra Deck**, **Field Deck**, **Graveyard (GY)**.
 
+The Boss Zone and Field Zone sit on pads **beside** the main board: Player 1 has the Boss
+on the left and the Field on the right, Player 2 is mirrored.
+
 ### Footprint
 
 Tribute monsters, Extra Deck monsters and Bosses have a **Footprint size**. The card
@@ -285,14 +288,11 @@ Card anatomy, top to bottom (the app renders cards this way):
 
 ```
 ┌──────────────────────────────┐
-│ NAME                 COST 7  │  ← Charge Cost sits in the name bar
-│ TRIBUTE                      │  ← card type
-│ ┌──────────────────────────┐ │
-│ │ pixel art          ◆◆◆   │ │  ← Charge as icons (no number; ◇ = 0)
-│ └──────────────────────────┘ │
+│ NAME ◆◆◆             COST 7  │  ← Charge icons (skewed; ◇ = 0) · Charge Cost
+│            [art]             │  ← icon art, no frame
 │ [🐜] [🐜]            👣 2   │  ← Tag icons (name on hover) · Footprint
-│ ON SUMMON: effect text…      │  ← keyword leads the line
-│ [⚔ 2200]      [⛨ 1500]       │  ← ATK and DEF in their own boxes (Actions: SET +n)
+│ ON SUMMON: summon an (Insect Shell) │ ← keyword pill; card names become pills
+│ [⚔⚔⚔ 2200]   [⛨⛨ 1500]       │  ← ATK / DEF boxes, 1 icon per 1000 (0–999: 1) (Actions: SET +n)
 └──────────────────────────────┘
 ```
 

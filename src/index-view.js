@@ -139,6 +139,18 @@
         const s = e.target.dataset.sel;
         if (s) { state[s] = e.target.value; renderGrid(); }
       });
+      // 3D tilt that follows the cursor while hovering a card.
+      root.addEventListener('pointermove', e => {
+        const cell = e.target.closest('.card-cell');
+        if (!cell || e.pointerType === 'touch') return;
+        const r = cell.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+        cell.style.transform = `perspective(700px) rotateX(${(-y * 16).toFixed(2)}deg) rotateY(${(x * 18).toFixed(2)}deg) translateY(-6px) scale(1.03)`;
+      });
+      root.addEventListener('pointerout', e => {
+        const cell = e.target.closest('.card-cell');
+        if (cell && !cell.contains(e.relatedTarget)) cell.style.transform = '';
+      });
       root.addEventListener('click', e => {
         const k = e.target.closest('[data-kind]');
         if (k) { state.kind = k.dataset.kind; renderFilters(); renderGrid(); return; }

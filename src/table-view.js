@@ -573,10 +573,6 @@
       mrow += `<div class="placed" style="grid-column:${col(at + cardOffset(n))}">${miniFor(pi, inst, { where: 'mon' })}</div>`;
     });
 
-    const fieldCell = zone('z-field', `data-fieldzone data-pi="${pi}"`,
-      p.field ? miniFor(pi, p.field.inst, { faceDown: p.field.faceDown, where: 'field' }) : '', 'Field');
-    const bossCell = zone('z-boss', `data-bosszone data-pi="${pi}"`,
-      p.boss ? miniFor(pi, p.boss, { where: 'boss' }) : MC.renderMini(null, { faceDown: true, back: 'boss', extraClass: 'boss-away' }), 'Boss');
     const bar = i => zone(`z-bar ${isTarget(pi, 'bar', i) ? 'target' : ''}`, `data-bar="${i}" data-pi="${pi}"`,
       miniFor(pi, p.barriers[i].inst, { faceDown: p.barriers[i].faceDown, where: 'bar', back: 'barrier' }), 'Barrier');
     const act = i => {
@@ -585,12 +581,23 @@
         p.actions[i] ? miniFor(pi, p.actions[i].inst, { faceDown: p.actions[i].faceDown, where: 'act' }) : '', 'Action');
     };
 
-    let front = [fieldCell, `<div class="mrow">${mrow}</div>`, pile(pi, 'gy', p.gy, 'GY', true, myHints?.gy), pile(pi, 'extra', p.extra, 'Extra')];
-    let back = [bossCell, bar(0), bar(1), act(0), act(1), act(2), bar(2), bar(3), pile(pi, 'deck', p.deck, 'Deck', false, myHints?.deck)];
+    let front = [`<div class="mrow">${mrow}</div>`, pile(pi, 'gy', p.gy, 'GY', true, myHints?.gy), pile(pi, 'extra', p.extra, 'Extra')];
+    let back = [bar(0), bar(1), act(0), act(1), act(2), bar(2), bar(3), pile(pi, 'deck', p.deck, 'Deck', false, myHints?.deck)];
     if (mirror) { front = front.reverse(); back = back.reverse(); }
     const rows = [`<div class="row">${front.join('')}</div>`, `<div class="row">${back.join('')}</div>`];
     if (mirror) rows.reverse();
     return `<div class="side side-${pi} ${S.active === pi ? 'is-active' : ''}">${rows.join('')}</div>`;
+  }
+
+  /** Boss and Field sit on pads off the board: Player 1 Boss left / Field right, Player 2 mirrored. */
+  function padHTML(pi, which) {
+    const p = P(pi);
+    const inner = which === 'boss'
+      ? zone('z-boss', `data-bosszone data-pi="${pi}"`,
+        p.boss ? miniFor(pi, p.boss, { where: 'boss' }) : MC.renderMini(null, { faceDown: true, back: 'boss', extraClass: 'boss-away' }), 'Boss')
+      : zone('z-field', `data-fieldzone data-pi="${pi}"`,
+        p.field ? miniFor(pi, p.field.inst, { faceDown: p.field.faceDown, where: 'field' }) : '', 'Field');
+    return `<div class="pad pad-${which} pad-p${pi}"><span class="pad-label">${which === 'boss' ? 'Boss' : 'Field'}</span>${inner}</div>`;
   }
 
   function plateHTML(pi) {
@@ -708,14 +715,13 @@
     const chips = (c.tags || []).map(MC.tagChip).join('') + (MC.isMonster(c) && fp(c) > 1 ? MC.footChip(fp(c)) : '');
     const live = loc.where === 'mon';
     const stats = MC.isMonster(c)
-      ? MC.statBoxes(live ? atk(loc.inst) : c.atk, live ? def(loc.inst) : c.def)
+      ? MC.statBoxes(live ? atk(loc.inst) : c.atk, live ? def(loc.inst) : c.def, '', true)
       : c.kind === 'action' ? `<span class="stat stat-set">SET <b>${MC.setCostLabel(c)}</b></span>` : `<span class="stat-label">${MC.esc(c.archetype || k.long)}</span>`;
     const ch = c.charge != null || c.id === SHELL ? MC.chargePips(live ? charge(loc.inst, loc.pi) : (c.charge ?? 0), 's-chg') : '';
     return `<div class="dialog" style="--bc:${k.frame}">
-      <div class="box portrait k-${c.kind} ${MC.SHOW_ART || !MC.isMonster(c) ? '' : 'no-art'}">${MC.artHTML(c)}${loc.inst.infected ? '<span class="inf-badge">INFECTED</span>' : ''}</div>
+      <div class="box portrait k-${c.kind} ${MC.SHOW_ART && MC.isMonster(c) ? '' : 'no-art'}">${MC.artHTML(c)}${loc.inst.infected ? '<span class="inf-badge">INFECTED</span>' : ''}</div>
       <div class="dialog-main">
-        <div class="box textbox"><span class="box-tab">${MC.esc(c.name)}${MC.costBadge(c)}</span>
-          <div class="dialog-meta"><b>${k.long}</b>${chips}</div>
+        <div class="box textbox"><span class="box-tab">${MC.esc(c.name)}<span class="tab-tags">${chips}</span>${MC.costBadge(c)}</span>
           <div class="dialog-text">${lines}</div></div>
         <div class="dialog-foot">
           <div class="box ctrlbox">${controlsHTML()}</div>
@@ -752,10 +758,13 @@
           ${handHTML(1)}
           <div class="stage"><div class="fit"><div class="persp">
             <div class="table3d">
-              <div class="glow-corner"></div>
+              <div class="offcol off-left">${padHTML(1, 'field')}${padHTML(0, 'boss')}</div>
+              <div class="mat">
               ${sideHTML(1)}
               <div class="midline"><span class="mid-phase">${PHASES[S.phase]} Phase</span><span class="mid-vs">VS</span><span class="mid-turn">T${S.turn}</span></div>
               ${sideHTML(0)}
+              </div>
+              <div class="offcol off-right">${padHTML(1, 'boss')}${padHTML(0, 'field')}</div>
             </div>
           </div></div></div>
           ${handHTML(0)}
