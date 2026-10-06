@@ -68,7 +68,5 @@
   document.body.insertAdjacentHTML('beforeend',
     `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${pixelFilter(2)}${pixelFilter(3)}</defs></svg>`);
 
-  document.getElementById('skull').src = MC.skullBackdrop();
-  document.documentElement.style.setProperty('--stone', `url(${MC.stoneTexture()})`);
   route();
 })();

@@ -690,15 +690,15 @@
         <div class="dialog-foot"><div class="box ctrlbox">${controlsHTML()}</div></div></div></div>`;
     }
     const c = loc.inst.card, k = MC.KINDS[c.kind];
-    const lines = (c.text || '').split('\n').filter(Boolean).map(l => `<p>${MC.esc(l)}</p>`).join('') || '<p class="vanilla">No effect.</p>';
-    const chips = (c.tags || []).map(t => MC.tagChip(t)).join('') + (c.keywords || []).map(t => MC.tagChip(t, true)).join('');
+    const lines = MC.formatText(c.text);
+    const chips = (c.tags || []).map(MC.tagChip).join('');
     const live = loc.where === 'mon';
     const stats = MC.isMonster(c)
       ? `<span class="s-atk">${MC.icon('atk')}${live ? atk(loc.inst) : c.atk}</span><span class="s-def">${MC.icon('def')}${live ? def(loc.inst) : c.def}</span>`
       : c.kind === 'action' ? `<span>COST ${c.cost}</span><span>SET ${MC.setCostLabel(c)}</span>` : `<span>${MC.esc(c.archetype || k.long)}</span>`;
-    const ch = c.charge != null || c.id === SHELL ? `<span class="s-chg">${MC.icon('charge')}${live ? charge(loc.inst, loc.pi) : (c.charge ?? 0)}</span>` : '';
+    const ch = c.charge != null || c.id === SHELL ? MC.chargePips(live ? charge(loc.inst, loc.pi) : (c.charge ?? 0), 's-chg') : '';
     return `<div class="dialog" style="--bc:${k.frame}">
-      <div class="box portrait"><img src="${MC.art(c)}" alt="" style="--glow:${MC.artColor(c)}">${loc.inst.infected ? '<span class="inf-badge">INFECTED</span>' : ''}</div>
+      <div class="box portrait"><img src="${MC.art(c)}" alt="">${loc.inst.infected ? '<span class="inf-badge">INFECTED</span>' : ''}</div>
       <div class="dialog-main">
         <div class="box textbox"><span class="box-tab">${MC.esc(c.name)}</span>
           <div class="dialog-meta"><b>${k.long}${c.cost != null && c.kind === 'tribute' ? ` · Cost ${c.cost}` : ''}${MC.isMonster(c) && c.kind !== 'basic' ? ` · Footprint ${fp(c)}` : ''}</b>${chips}</div>

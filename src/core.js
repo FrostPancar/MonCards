@@ -7,14 +7,15 @@
 
   MC.byId = Object.fromEntries(MC.CARDS.map(c => [c.id, c]));
 
+  // GBC-style palette: bright card bodies, pale art backdrops.
   MC.KINDS = {
-    basic:   { label: 'Basic',   long: 'Basic Monster',      frame: '#e6dcc4', deep: '#5b5140', back: 'main' },
-    tribute: { label: 'Tribute', long: 'Tribute Monster',    frame: '#ff4d6a', deep: '#6b1530', back: 'main' },
-    extra:   { label: 'Extra',   long: 'Extra Deck Monster', frame: '#3fe0c8', deep: '#0f4f52', back: 'extra' },
-    action:  { label: 'Action',  long: 'Action',             frame: '#ffb23f', deep: '#6a3a0c', back: 'main' },
-    field:   { label: 'Field',   long: 'Field',              frame: '#78e05a', deep: '#1f4f22', back: 'field' },
-    barrier: { label: 'Barrier', long: 'Barrier',            frame: '#6f8bff', deep: '#262c74', back: 'barrier' },
-    boss:    { label: 'Boss',    long: 'Boss Monster',       frame: '#c27bff', deep: '#3d1466', back: 'boss' },
+    basic:   { label: 'Basic',   long: 'Basic Monster',      frame: '#f2c84b', pale: '#fff4cf', back: 'main' },
+    tribute: { label: 'Tribute', long: 'Tribute Monster',    frame: '#ee4458', pale: '#ffe0e3', back: 'main' },
+    extra:   { label: 'Extra',   long: 'Extra Deck Monster', frame: '#2fc7b4', pale: '#d8fbf5', back: 'extra' },
+    action:  { label: 'Action',  long: 'Action',             frame: '#f5922e', pale: '#ffe8d2', back: 'main' },
+    field:   { label: 'Field',   long: 'Field',              frame: '#3dbb4f', pale: '#dcf8d9', back: 'field' },
+    barrier: { label: 'Barrier', long: 'Barrier',            frame: '#3a7ced', pale: '#dde8ff', back: 'barrier' },
+    boss:    { label: 'Boss',    long: 'Boss Monster',       frame: '#9152e0', pale: '#efe2ff', back: 'boss' },
   };
   MC.KIND_ORDER = ['boss', 'basic', 'tribute', 'extra', 'action', 'field', 'barrier'];
   MC.isMonster = c => ['basic', 'tribute', 'extra', 'boss'].includes(c.kind);
@@ -26,16 +27,15 @@
   const ICONS = {
     atk:    ['.....##', '....###', '...###.', '#.###..', '.###...', '..#....', '#.#....'],
     def:    ['#######', '#.....#', '#.###.#', '#.###.#', '.#.#.#.', '..#.#..', '...#...'],
-    charge: ['...#...', '..###..', '.##.##.', '##...##', '.##.##.', '..###..', '...#...'],
+    charge: ['...#...', '..###..', '.#####.', '#######', '.#####.', '..###..', '...#...'],
+    chargeEmpty: ['...#...', '..#.#..', '.#...#.', '#.....#', '.#...#.', '..#.#..', '...#...'],
     heart:  ['.##.##.', '#######', '#######', '#######', '.#####.', '..###..', '...#...'],
-    // tag icons (9×9), drawn as flat silhouettes
+    // tag icons (9×9)
     Insect: ['.#.....#.', '..#...#..', '...###...', '..#####..', '#.#####.#', '.#######.', '#.#####.#', '.#.###.#.', '...#.#...'],
     Ant:    ['..#...#..', '...#.#...', '...###...', '....#....', '#..###..#', '.#######.', '..#####..', '.#######.', '#..###..#'],
     Fungus: ['...###...', '.#######.', '##.###.##', '#########', '.#######.', '...###...', '...###...', '..#####..', '.........'],
     Undead: ['..#####..', '.#######.', '##..#..##', '##..#..##', '#########', '.###.###.', '..#####..', '..#.#.#..', '.........'],
     Infected: ['....#....', '.#..#..#.', '..#####..', '..##.##..', '###...###', '..##.##..', '..#####..', '.#..#..#.', '....#....'],
-    Blocker: ['#########', '#.......#', '#.#####.#', '#.#####.#', '#.#####.#', '.#.###.#.', '..#.#.#..', '...#.#...', '....#....'],
-    Unblockable: ['.........', '##.....##', '###...###', '.###.###.', '..#####..', '...###...', '..#.#.#..', '.#.....#.', '.........'],
     // card-back emblems (9×9)
     main:    ['....#....', '...###...', '..##.##..', '.##...##.', '##..#..##', '.##...##.', '..##.##..', '...###...', '....#....'],
     extra:   ['....#....', '....#....', '..#####..', '.##...##.', '###.#.###', '.##...##.', '..#####..', '....#....', '....#....'],
@@ -52,12 +52,29 @@
     return `<svg class="px-icon ${cls}" viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges" aria-hidden="true"><path d="${d}"/></svg>`;
   };
 
-  MC.TAG_COLORS = {
-    Insect: '#8ef05a', Ant: '#ff8a3d', Fungus: '#ff5ad8', Undead: '#efe6d2',
-    Infected: '#ff6ad5', Blocker: '#5ab4ff', Unblockable: '#ffe14d',
+  /** Charge as a row of icons, no number. Zero Charge shows one hollow icon. */
+  MC.chargePips = (n, cls = '') => {
+    const v = Math.max(0, n | 0);
+    const icons = v ? MC.icon('charge').repeat(v) : MC.icon('chargeEmpty');
+    return `<span class="pips ${v ? '' : 'pips-zero'} ${cls}" title="Charge ${v}" aria-label="Charge ${v}">${icons}</span>`;
   };
-  MC.tagChip = (t, keyword) =>
-    `<span class="tag ${keyword ? 'tag-kw' : ''}" style="--tc:${MC.TAG_COLORS[t] || '#c8c2ee'}">${MC.icon(t)}${MC.esc(t)}</span>`;
+
+  MC.TAG_COLORS = { Insect: '#3aa63a', Ant: '#e2582a', Fungus: '#d03aa8', Undead: '#7a6c94', Infected: '#d03aa8' };
+  MC.tagChip = t =>
+    `<span class="tag" style="--tc:${MC.TAG_COLORS[t] || '#555'}">${MC.icon(t)}${MC.esc(t)}</span>`;
+
+  // Keywords that open an effect line ("SUMMON:" style in the reference UI).
+  const KEYWORDS = ['Once per turn', 'On Summon', 'On Destroy', 'On Tribute', 'Blocker', 'Unblockable', 'Summon'];
+  const KW_RE = new RegExp(`^(${KEYWORDS.join('|')})([:.])\\s*`, 'i');
+  MC.formatLine = line => {
+    const m = line.match(KW_RE);
+    if (!m) return MC.esc(line);
+    const rest = line.slice(m[0].length);
+    return `<b class="kw">${MC.esc(m[1])}${m[2] === ':' ? ':' : ''}</b>${rest ? ' ' + MC.esc(rest) : ''}`;
+  };
+  MC.formatText = text =>
+    (text || '').split('\n').filter(Boolean).map(l => `<p>${MC.formatLine(l)}</p>`).join('')
+    || '<p class="vanilla">No effect.</p>';
 
   // ───────────────────────── Procedural pixel art ─────────────────────────
   function hash(str) {
@@ -71,15 +88,15 @@
   }
   const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 
-  // Bright flat silhouette colours, like phosphor sprites on a black CRT.
+  // Flat sprite colours per tag family.
   const FAMILY = {
-    Fungus: ['#ff5ad8', '#d06bff', '#ff7ab0'],
-    Undead: ['#efe6d2', '#c8c2ee'],
-    Ant:    ['#ff8a3d', '#ff5a4a', '#ffb03d', '#f06a3a'],
-    Insect: ['#8ef05a', '#4fe0a0', '#5ad1f0', '#f0e05a', '#6cf0c8'],
+    Fungus: ['#e04cb8', '#a85ce8', '#f0709c'],
+    Undead: ['#b8b0d0', '#9a92b8'],
+    Ant:    ['#f07a32', '#e8483a', '#f0a030', '#d8602a'],
+    Insect: ['#5cc840', '#2fb890', '#3aa8e0', '#d8c030', '#48c8a0'],
   };
   MC.artColor = function (card) {
-    if (card.id === 'hive-queen') return '#ffd84d';
+    if (card.id === 'hive-queen') return '#f0c020';
     if (!MC.isMonster(card)) return MC.KINDS[card.kind].frame;
     const t = card.tags || [];
     const fam = t.includes('Fungus') ? 'Fungus' : t.includes('Ant') ? 'Ant' : t.includes('Undead') ? 'Undead' : 'Insect';
@@ -128,17 +145,28 @@
     return full;
   }
 
-  /** Flat one-colour silhouette with black eye holes. */
-  function drawSilhouette(ctx, grid, ox, oy, color, r) {
+  /** Flat sprite with a black outline, a highlight edge and black eyes. */
+  function drawSprite(ctx, grid, ox, oy, color, r) {
     const h = grid.length, w = grid[0].length;
-    ctx.fillStyle = color;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (grid[y][x]) ctx.fillRect(ox + x, oy + y, 1, 1);
+    const at = (x, y) => (y >= 0 && y < h && x >= 0 && x < w) ? grid[y][x] : 0;
+    ctx.fillStyle = '#101018';
+    for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++) {
+      if (!at(x, y) && (at(x + 1, y) || at(x - 1, y) || at(x, y + 1) || at(x, y - 1))) ctx.fillRect(ox + x, oy + y, 1, 1);
+    }
+    const light = shade(color, 1.35), dark = shade(color, .7);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (!grid[y][x]) continue;
+      ctx.fillStyle = !at(x, y - 1) ? light : !at(x, y + 1) ? dark : color;
+      ctx.fillRect(ox + x, oy + y, 1, 1);
+    }
     const mid = Math.floor(w / 2);
     for (let y = Math.floor(h * 0.2); y < h * 0.6; y++) {
       const ex = mid - 2 - Math.floor(r() * 2), row = grid[y];
       if (row[ex] && row[w - 1 - ex] && row[ex - 1] && row[w - ex] && (grid[y + 1] || [])[ex]) {
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = '#101018';
         ctx.fillRect(ox + ex, oy + y, 1, 2); ctx.fillRect(ox + w - 1 - ex, oy + y, 1, 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(ox + ex, oy + y, 1, 1); ctx.fillRect(ox + w - 1 - ex, oy + y, 1, 1);
         break;
       }
     }
@@ -158,8 +186,17 @@
 
   function shade(hex, f) {
     const n = parseInt(hex.slice(1), 16);
-    const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * f));
+    const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.max(0, Math.min(255, Math.round(v * f))));
     return '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+  }
+
+  /** Pale backdrop with a dithered floor band in the card's colour. */
+  function backdrop(ctx, W, H, k) {
+    ctx.fillStyle = k.pale; ctx.fillRect(0, 0, W, H);
+    const hz = Math.floor(H * 0.7);
+    for (let y = hz; y < H; y++) for (let x = 0; x < W; x++) {
+      if (BAYER[y % 4][x % 4] < (y - hz) * 1.8 + 3) { ctx.fillStyle = shade(k.frame, 1.15); ctx.fillRect(x, y, 1, 1); }
+    }
   }
 
   const artCache = {};
@@ -171,47 +208,44 @@
     const r = rng(hash(card.id));
     const k = MC.KINDS[card.kind];
     const col = MC.artColor(card);
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    backdrop(ctx, W, H, k);
 
     if (MC.isMonster(card)) {
-      // faint floor dither
-      for (let y = H - 5; y < H; y++) for (let x = 0; x < W; x++) {
-        if (BAYER[y % 4][x % 4] < (y - (H - 5)) * 2) { ctx.fillStyle = shade(k.frame, .22); ctx.fillRect(x, y, 1, 1); }
-      }
-      const big = card.kind === 'boss' ? 24 : card.kind === 'tribute' ? 21 : 18;
+      const big = card.kind === 'boss' ? 24 : card.kind === 'tribute' ? 21 : 19;
       const insect = (card.tags || []).includes('Insect');
       const grid = genCreature(r, big - 4 + (big % 2), big - 2, 0.82 + r() * 0.12, insect);
       const gw = grid[0].length, gh = grid.length;
-      const bx = card.kind === 'boss' ? Math.floor((W - gw) / 2) : Math.floor((W - gw) / 2) + 5;
-      drawSilhouette(ctx, grid, bx, H - 3 - gh, col, r);
-      if (card.kind !== 'boss') { // small companion sprite, like the reference sheet
-        const small = genCreature(rng(hash(card.id + 's')), 9, 9, 0.9, insect);
-        drawSilhouette(ctx, small, bx - 11, H - 3 - small.length, shade(col, .55), r);
-      } else {
-        ctx.fillStyle = '#fff6c8';
+      drawSprite(ctx, grid, Math.floor((W - gw) / 2), H - 3 - gh, col, r);
+      if (card.kind === 'boss') {
+        ctx.fillStyle = '#f0c020';
         for (let i = 0; i < 7; i++) ctx.fillRect(Math.floor(r() * W), Math.floor(r() * (H / 2.5)), 1, 1);
       }
     } else if (card.kind === 'field') {
-      const hz = Math.floor(H * 0.72);
-      for (let y = hz; y < H; y++) for (let x = 0; x < W; x++) {
-        if (BAYER[y % 4][x % 4] < (y - hz) * 1.6) { ctx.fillStyle = shade(col, .35); ctx.fillRect(x, y, 1, 1); }
-      }
-      ctx.fillStyle = col; ctx.fillRect(0, hz, W, 1);
+      const hz = Math.floor(H * 0.7);
       for (let i = 0; i < 6; i++) {
         const x = 2 + Math.floor(r() * (W - 4)), hgt = 3 + Math.floor(r() * 9);
-        ctx.fillStyle = col; ctx.fillRect(x, hz - hgt, 1, hgt); ctx.fillRect(x - 1, hz - hgt, 3, 2);
+        ctx.fillStyle = '#101018'; ctx.fillRect(x - 2, hz - hgt - 1, 5, 4); ctx.fillRect(x - 1, hz - hgt, 3, hgt + 1);
+        ctx.fillStyle = shade(col, .8); ctx.fillRect(x, hz - hgt + 1, 1, hgt - 1);
+        ctx.fillStyle = col; ctx.fillRect(x - 1, hz - hgt, 3, 2);
       }
-      ctx.fillStyle = '#fff6c8'; ctx.fillRect(Math.floor(W * 0.18 + r() * W * 0.6), 4, 3, 3);
+      ctx.fillStyle = '#101018'; ctx.fillRect(0, hz, W, 1);
+      const sx = Math.floor(W * 0.18 + r() * W * 0.6);
+      ctx.fillStyle = '#f0c020'; ctx.fillRect(sx, 4, 4, 4);
+      ctx.fillStyle = '#fff8c0'; ctx.fillRect(sx, 4, 2, 2);
     } else if (card.kind === 'barrier') {
       const sh = ICONS.barrier, s = 2, sx = Math.floor((W - 9 * s) / 2), sy = Math.floor((H - 9 * s) / 2);
+      ctx.fillStyle = '#101018';
+      sh.forEach((row, y) => [...row].forEach((ch, x) => { if (ch === '#') ctx.fillRect(sx + x * s - 1, sy + y * s - 1, s + 2, s + 2); }));
       sh.forEach((row, y) => [...row].forEach((ch, x) => {
-        if (ch === '#') { ctx.fillStyle = col; ctx.fillRect(sx + x * s, sy + y * s, s, s); }
+        if (ch === '#') { ctx.fillStyle = y < 2 ? shade(col, 1.3) : col; ctx.fillRect(sx + x * s, sy + y * s, s, s); }
       }));
       const rune = genRune(r, 5);
-      rune.forEach((row, y) => row.forEach((v, x) => { if (v) { ctx.fillStyle = '#000'; ctx.fillRect(sx + 6 + x, sy + 5 + y, 1, 1); } }));
+      rune.forEach((row, y) => row.forEach((v, x) => { if (v) { ctx.fillStyle = '#ffffff'; ctx.fillRect(sx + 6 + x, sy + 5 + y, 1, 1); } }));
     } else { // action
       const rune = genRune(r, 17), ox = Math.floor((W - 17) / 2), oy = Math.floor((H - 17) / 2);
-      rune.forEach((row, y) => row.forEach((v, x) => { if (v) { ctx.fillStyle = col; ctx.fillRect(ox + x, oy + y, 1, 1); } }));
+      ctx.fillStyle = '#101018';
+      rune.forEach((row, y) => row.forEach((v, x) => { if (v) ctx.fillRect(ox + x - 1, oy + y - 1, 3, 3); }));
+      rune.forEach((row, y) => row.forEach((v, x) => { if (v) { ctx.fillStyle = (x + y) % 6 === 0 ? '#ffffff' : col; ctx.fillRect(ox + x, oy + y, 1, 1); } }));
     }
     return (artCache[card.id] = cv.toDataURL());
   };
@@ -221,10 +255,6 @@
 
   MC.renderBack = (back = 'main', cls = '', attrs = '') =>
     `<div class="card-back back-${back} ${cls}" ${attrs}><span class="back-emblem">${MC.icon(back)}</span></div>`;
-
-  function chipsHTML(card) {
-    return (card.tags || []).map(t => MC.tagChip(t)).join('') + (card.keywords || []).map(t => MC.tagChip(t, true)).join('');
-  }
 
   function footprint(card) {
     if (!MC.isMonster(card) || card.kind === 'basic') return '';
@@ -254,16 +284,13 @@
   MC.renderCard = function (card, opts = {}) {
     if (opts.faceDown) return MC.renderBack(MC.backOf(card), 'card ' + (opts.extraClass || ''));
     const k = MC.KINDS[card.kind];
-    const charge = card.charge != null ? `<span class="c-charge" title="Charge">${MC.icon('charge')}${card.charge}</span>` : '';
     const cost = card.cost != null && card.kind === 'tribute' ? `<span class="c-cost" title="Charge Cost">COST ${card.cost}</span>` : '';
-    const text = (card.text || '').split('\n').filter(Boolean).map(l => `<p>${MC.esc(l)}</p>`).join('')
-      || '<p class="vanilla">No effect.</p>';
     return `<div class="card k-${card.kind} ${opts.extraClass || ''}" data-card="${card.id}">
-      <div class="c-head"><span class="c-name">${MC.esc(card.name)}</span>${charge}</div>
+      <div class="c-head"><span class="c-name">${MC.esc(card.name)}</span></div>
       <div class="c-sub"><span>${k.label}</span>${cost}</div>
-      <div class="c-art"><img src="${MC.art(card)}" alt="" style="--glow:${MC.artColor(card)}"></div>
-      <div class="c-tags">${chipsHTML(card)}${footprint(card)}</div>
-      <div class="c-text">${text}</div>
+      <div class="c-art"><img src="${MC.art(card)}" alt="">${card.charge != null ? MC.chargePips(card.charge, 'c-charge') : ''}</div>
+      <div class="c-tags">${(card.tags || []).map(MC.tagChip).join('')}${footprint(card)}</div>
+      <div class="c-text">${MC.formatText(card.text)}</div>
       ${bottomBar(card)}
     </div>`;
   };
@@ -271,8 +298,9 @@
   /** Compact card for the play table. */
   MC.renderMini = function (card, opts = {}) {
     if (opts.faceDown) {
-      return `<div class="mini mini-back back-${opts.back || MC.backOf(card)} ${opts.extraClass || ''}" ${opts.attrs || ''}>
-        <span class="back-emblem">${MC.icon(opts.back || MC.backOf(card))}</span>${opts.label ? `<span class="mini-flag">${opts.label}</span>` : ''}</div>`;
+      const back = opts.back || MC.backOf(card);
+      return `<div class="mini mini-back back-${back} ${opts.extraClass || ''}" ${opts.attrs || ''}>
+        <span class="back-emblem">${MC.icon(back)}</span>${opts.label ? `<span class="mini-flag">${opts.label}</span>` : ''}</div>`;
     }
     const m = opts.mods || {};
     const stat = (base, d) => `<b class="${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${base + (d || 0)}</b>`;
@@ -281,14 +309,15 @@
       : card.kind === 'action' ? `<div class="m-stats"><b>C${card.cost}</b></div>`
       : `<div class="m-stats m-label">${MC.KINDS[card.kind].label}</div>`;
     const ch = opts.charge ?? card.charge;
-    const charge = ch != null ? `<span class="m-charge ${opts.charge != null && opts.charge !== card.charge ? 'up' : ''}">${ch}</span>` : '';
+    const boosted = opts.charge != null && opts.charge !== card.charge;
+    const charge = ch != null ? MC.chargePips(ch, `m-charge ${boosted ? 'up' : ''}`) : '';
     const tag = (card.tags || [])[card.tags?.includes('Ant') ? card.tags.indexOf('Ant') : 0];
     return `<div class="mini k-${card.kind} ${opts.extraClass || ''}" ${opts.attrs || ''}>
       <div class="m-name">${MC.esc(card.name)}</div>
-      <div class="m-art"><img src="${MC.art(card)}" alt="" style="--glow:${MC.artColor(card)}"></div>
-      ${stats}${charge}
-      ${tag ? `<span class="m-tag" style="--tc:${MC.TAG_COLORS[tag]}">${MC.icon(tag)}</span>` : ''}
-      ${opts.infected ? `<span class="m-infected" title="Infected">${MC.icon('Infected')}</span>` : ''}
+      <div class="m-art"><img src="${MC.art(card)}" alt="">${charge}
+        ${tag ? `<span class="m-tag" style="--tc:${MC.TAG_COLORS[tag]}">${MC.icon(tag)}</span>` : ''}
+        ${opts.infected ? `<span class="m-infected" title="Infected">${MC.icon('Infected')}</span>` : ''}</div>
+      ${stats}
       ${opts.label ? `<span class="mini-flag">${opts.label}</span>` : ''}
     </div>`;
   };
@@ -324,52 +353,5 @@
     if (protectors > 1) errors.push('More than 1 Basic Protector Barrier');
     if (MC.byId[deck.boss]?.kind !== 'boss') errors.push('Boss is missing');
     return { errors, warnings };
-  };
-
-  // Pixel background skull (homage to the reference art), drawn once.
-  MC.skullBackdrop = function () {
-    const half = [
-      '......#####', '...########', '..#########', '.##########', '.##########', '###########',
-      '###########', '###...#####', '##.....####', '##.....####', '##.....####', '###...#####',
-      '.#########.', '..#######..', '...#####...', '...##.##.##', '...########', '....#######',
-    ];
-    const rows = half.map(h => h + h.slice(0, -1).split('').reverse().join(''));
-    const W = rows[0].length, H = rows.length;
-    const cv = document.createElement('canvas'); cv.width = W + 4; cv.height = H + 4;
-    const ctx = cv.getContext('2d');
-    rows.forEach((row, y) => [...row].forEach((ch, x) => {
-      if (ch !== '#') return;
-      ctx.fillStyle = BAYER[y % 4][x % 4] > 10 ? '#16323a' : '#10252c';
-      ctx.fillRect(x + 2, y + 2, 1, 1);
-    }));
-    ctx.fillStyle = '#5bd13a';
-    [[4, 8], [5, 9], [6, 10], [4, 10], [6, 8]].forEach(([x, y]) => ctx.fillRect(x + 2, y + 2, 1, 1));
-    ctx.fillStyle = '#8a5cff';
-    [[15, 8], [16, 8], [17, 8], [15, 9], [17, 9], [15, 10], [16, 10], [17, 10]].forEach(([x, y]) => ctx.fillRect(x + 2, y + 2, 1, 1));
-    ctx.fillStyle = '#3df0ff'; ctx.fillRect(18, 11, 1, 1);
-    return cv.toDataURL();
-  };
-
-  MC.stoneTexture = function () {
-    const S = 48;
-    const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
-    const ctx = cv.getContext('2d');
-    const r = rng(1234567);
-    const cols = ['#3c2d55', '#45345f', '#4e3b6b', '#382a4f'];
-    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-      ctx.fillStyle = cols[(BAYER[y % 4][x % 4] + Math.floor(r() * 6)) % cols.length];
-      ctx.fillRect(x, y, 1, 1);
-    }
-    ctx.fillStyle = '#271c38';
-    for (let y = 0; y < S; y += 12) {
-      ctx.fillRect(0, y, S, 1);
-      const off = (y / 12) % 2 ? 0 : 12;
-      for (let x = off; x < S; x += 24) ctx.fillRect(x, y, 1, 12);
-    }
-    for (let i = 0; i < 30; i++) {
-      ctx.fillStyle = r() < 0.5 ? '#6a4f8f' : '#b0476f';
-      ctx.fillRect(Math.floor(r() * S), Math.floor(r() * S), 1, 1);
-    }
-    return cv.toDataURL();
   };
 })();

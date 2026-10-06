@@ -34,8 +34,8 @@ MC.CARDS = [
     text:
       'When your Insects are sent from the field to the GY, put them under this card instead.\n' +
       'At the start of your turn, you can swap an "Insect Shell" on the field with a Basic Insect under this card.\n' +
-      'When this card has 15+ cards under it, you can shuffle all of them into your Deck/Extra Deck to summon this card.\n' +
-      'When this card is summoned, summon any number of Basic Insects from your Deck.\n' +
+      'Summon: when this card has 15+ cards under it, shuffle all of them into your Deck/Extra Deck.\n' +
+      'On Summon: summon any number of Basic Insects from your Deck.\n' +
       'When this card would be destroyed, you can tribute another Insect instead.',
   },
   {
@@ -56,7 +56,7 @@ MC.CARDS = [
     atk: 100, def: 100, footprint: 1, tags: ['Insect'], limit: Infinity,
     flags: { noAttack: true, noBattleLpLoss: true },
     text:
-      'You can summon 1 "Insect Shell" when one of your Insect monsters (except "Insect Shell") is tributed or destroyed.\n' +
+      'Summon: when one of your Insect monsters (except "Insect Shell") is tributed or destroyed.\n' +
       'Cannot attack. You don\'t lose LP when this card is destroyed in battle.\n' +
       'You can have more than 2 of this card in your Extra Deck.',
   },
@@ -66,16 +66,16 @@ MC.CARDS = [
     atk: 1500, def: 1500, charge: 0, tags: ['Insect'], text: '' },
   { id: 'beetle-defender', name: 'Beetle Defender', kind: 'basic',
     atk: 1000, def: 1500, charge: 1, tags: ['Insect'], keywords: ['Blocker'], flags: { blocker: true },
-    text: 'Blocker: when an opponent\'s monster attacks, you can redirect the attack to this card.' },
+    text: 'Blocker.' },
   { id: 'larva', name: 'Larva', kind: 'basic',
     atk: 100, def: 100, charge: 3, tags: ['Insect'], chargeBonus: { insectTribute: 2 },
-    text: '+2 Charge when tributed for an Insect monster.' },
+    text: 'On Tribute: +2 Charge when tributed for an Insect monster.' },
   { id: 'dung-beetle', name: 'Dung Beetle', kind: 'basic',
     atk: 1200, def: 1000, charge: 2, tags: ['Insect'], aura: { shellCharge: 2 },
     text: '"Insect Shell"s on your field get +2 Charge.' },
   { id: 'silkworm', name: 'Silkworm', kind: 'basic',
     atk: 500, def: 500, charge: 2, tags: ['Insect'], chargeBonus: { insectTribute: 2, insectAction: 2 },
-    text: '+2 Charge when used to pay for an Insect Action card or tributed for an Insect monster.' },
+    text: 'On Tribute: +2 Charge when used for an Insect Action card or an Insect monster.' },
 
   // ───────────────────── Tribute monsters ─────────────────────
   { id: 'mantis', name: 'Mantis', kind: 'tribute',
@@ -83,7 +83,7 @@ MC.CARDS = [
     text: 'Once per turn: after this card destroys a Barrier or monster, it can attack again.' },
   { id: 'moth', name: 'Moth', kind: 'tribute',
     atk: 1500, def: 1500, charge: 3, cost: 5, footprint: 1, tags: ['Insect'],
-    text: 'When summoned: you can play an Insect Action card without paying its cost.' },
+    text: 'On Summon: you can play an Insect Action card without paying its cost.' },
   { id: 'wasp', name: 'Wasp', kind: 'tribute',
     atk: 2000, def: 1000, charge: 3, cost: 6, footprint: 1, tags: ['Insect'],
     text: 'You can tribute this card to destroy 1 of your opponent\'s monsters.' },
@@ -117,16 +117,16 @@ MC.CARDS = [
     text: 'Blocker.' },
   { id: 'worker-ant', name: 'Worker Ant', kind: 'basic',
     atk: 500, def: 500, charge: 2, tags: ['Insect', 'Ant'],
-    text: 'When summoned: draw 1.' },
+    text: 'On Summon: draw 1.' },
   { id: 'ant-larva', name: 'Ant Larva', kind: 'basic',
     atk: 100, def: 100, charge: 3, tags: ['Insect', 'Ant'],
-    text: 'When summoned: add 1 Ant from your Deck to your hand.' },
+    text: 'On Summon: add 1 Ant from your Deck to your hand.' },
   { id: 'fire-ant', name: 'Fire Ant', kind: 'basic',
     atk: 500, def: 500, charge: 1, tags: ['Insect', 'Ant'],
     text: 'Tribute this card and target 1 of your opponent\'s monsters: it can\'t be tributed or attack until the end of your opponent\'s turn.\nCan be used to target Infected monsters during your opponent\'s turn.' },
   { id: 'flying-ant', name: 'Flying Ant', kind: 'basic',
     atk: 1200, def: 500, charge: 0, tags: ['Insect', 'Ant'], keywords: ['Unblockable'], flags: { unblockable: true },
-    text: 'Can\'t be blocked.' },
+    text: 'Unblockable.' },
 
   // ───────────────────── Fungus deck: Tributes ─────────────────────
   { id: 'big-bad', name: 'Big Bad', kind: 'tribute',
@@ -137,7 +137,7 @@ MC.CARDS = [
     text: 'Once per turn: tribute a monster to flip 1 of your Barriers face-up, then you can destroy 1 Basic monster.' },
   { id: 'emperor', name: 'Emperor', kind: 'tribute',
     atk: 3200, def: 2500, charge: 4, cost: 18, footprint: 2, tags: ['Insect', 'Ant'],
-    text: 'When summoned: your opponent can\'t use Action cards until the end of their turn, and negate all their non-Boss monster effects until the end of your turn.' },
+    text: 'On Summon: your opponent can\'t use Action cards until the end of their turn, and negate all their non-Boss monster effects until the end of your turn.' },
 
   // ───────────────────── Fungus deck: Actions (working titles) ─────────────────────
   { id: 'spore-cloud', name: 'Spore Cloud', kind: 'action',
@@ -163,7 +163,7 @@ MC.CARDS = [
   { id: 'lamp', name: 'Lamp', kind: 'field',
     text: 'Once per turn: reveal the top 5 cards of your Deck and play 1 Basic Insect among them.' },
   { id: 'royal-nursery', name: 'Royal Nursery', kind: 'field',      // working title
-    text: 'Once per turn, when an Insect is summoned: add 1 Insect from your Deck to your hand.' },
+    text: 'Once per turn: when an Insect is summoned, add 1 Insect from your Deck to your hand.' },
   { id: 'brood-chamber', name: 'Brood Chamber', kind: 'field',      // working title
     text: 'When an Insect you control is destroyed: add 1 Insect from your Deck to your hand.' },
   { id: 'offering-pit', name: 'Offering Pit', kind: 'field',        // working title
@@ -177,9 +177,9 @@ MC.CARDS = [
 
   // ───────────────────────── Barrier cards ─────────────────────────
   { id: 'cocoon', name: 'Cocoon', kind: 'barrier', archetype: 'On Destroy', onBreak: 'summonShell',
-    text: 'When this card is destroyed: summon 1 "Insect Shell".' },
+    text: 'On Destroy: summon 1 "Insect Shell".' },
   { id: 'moldy-shield', name: 'Moldy Shield', kind: 'barrier', archetype: 'On Destroy', onBreak: 'infectAttacker',
-    text: 'When this card is destroyed: Infect the attacking monster.' },
+    text: 'On Destroy: Infect the attacking monster.' },
 ];
 
 MC.DECKS = {

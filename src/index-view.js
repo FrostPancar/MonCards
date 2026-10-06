@@ -81,7 +81,7 @@
       c.tags?.length ? ['Tags', c.tags.join(', ')] : null,
       c.keywords?.length ? ['Keywords', c.keywords.join(', ')] : null,
       MC.isMonster(c) ? ['ATK / DEF', `${c.atk} / ${c.def}`] : null,
-      c.charge != null ? ['Charge', c.charge] : null,
+      c.charge != null ? ['Charge', { html: MC.chargePips(c.charge) }] : null,
       c.cost != null ? ['Charge Cost', c.cost] : null,
       c.kind === 'action' ? ['Set cost (opp. turn)', c.setCost == null ? 'not decided' : '+' + c.setCost] : null,
       MC.isMonster(c) && c.kind !== 'basic' ? ['Footprint', c.footprint || 1] : null,
@@ -93,7 +93,7 @@
       <div class="detail-info">
         <span class="eyebrow">${MC.esc(MC.KINDS[c.kind].long)}</span>
         <h2>${MC.esc(c.name)}</h2>
-        <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${MC.esc(v)}</dd>`).join('')}</dl>
+        <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v?.html ?? MC.esc(v)}</dd>`).join('')}</dl>
         ${inDecks ? `<h4>In decks</h4><ul class="in-decks">${inDecks}</ul>` : ''}
       </div></div>`, { wide: true });
   }
