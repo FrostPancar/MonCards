@@ -148,6 +148,8 @@
   MC.IndexView = {
     mount(el) {
       root = el;
+      // Someone else's new or edited card arrived from the shared store.
+      MC.onCardsChanged(() => renderGrid());
       root.innerHTML = `<div class="index-wrap">
         <div class="filters box"></div>
         <div class="index-body"></div>

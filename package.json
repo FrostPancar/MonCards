@@ -1,0 +1,11 @@
+{
+  "name": "moncards",
+  "private": true,
+  "description": "MonCards card index and play table. Static site plus one Netlify Function for the shared card store.",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.3"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^6.0.2"
+  }
+}

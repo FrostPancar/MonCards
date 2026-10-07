@@ -1,39 +1,122 @@
 /*
  * Card Creator: design or edit a card with a live preview.
  *
- * Two kinds of saved changes live in this browser (localStorage):
- *   - new cards made in the creator (shown with a "Custom" badge), and
- *   - edits to existing cards, stored as overrides keyed by card id.
- * Both are merged into the pool on load. "Copy code" gives a snippet to paste
+ * Custom cards and edits to existing cards are shared by everyone who uses the
+ * site: they live in a shared card store (/api/cards, a Netlify Function backed
+ * by Netlify Blobs). This browser keeps a cached copy so the pool shows up
+ * instantly and works offline; changes that can't reach the store wait in a
+ * queue and are sent on the next sync. "Copy code" gives a snippet to paste
  * into data/cards.js to make a card permanent.
  */
 (function () {
   const MC = window.MC;
-  const NEW_KEY = 'mc-custom-cards', EDIT_KEY = 'mc-card-edits';
+  const API = '/api/cards';
+  const CACHE_KEY = 'mc-shared-cards', QUEUE_KEY = 'mc-pending-card-ops';
+  const LEGACY_NEW = 'mc-custom-cards', LEGACY_EDIT = 'mc-card-edits'; // pre-sharing, this-browser-only saves
 
   const read = (key, empty) => { try { return JSON.parse(localStorage.getItem(key) || empty); } catch (e) { return JSON.parse(empty); } };
   const write = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; } };
+  const drop = key => { try { localStorage.removeItem(key); } catch (e) { /* storage blocked */ } };
 
   function reindex() {
     MC.byId = Object.fromEntries(MC.CARDS.map(c => [c.id, c]));
     MC._byName = null;
   }
 
-  // Originals of the built-in cards, so edits can be reset.
-  const ORIGINAL = Object.fromEntries(MC.CARDS.map(c => [c.id, JSON.parse(JSON.stringify(c, (k, v) => v === Infinity ? 'Infinity' : v),
-    (k, v) => v === 'Infinity' ? Infinity : v)]));
+  // Originals of the built-in cards, so edits can be reset and the pool rebuilt.
+  const BASE = MC.CARDS.map(c => JSON.parse(JSON.stringify(c, (k, v) => v === Infinity ? 'Infinity' : v),
+    (k, v) => v === 'Infinity' ? Infinity : v));
+  const ORIGINAL = Object.fromEntries(BASE.map(c => [c.id, c]));
 
-  // Merge saved edits and new cards into the pool before any view renders.
-  const edits = read(EDIT_KEY, '{}');
   const applyEdit = (c, e) => {
     const { _cleared = [], ...fields } = e;
     const card = { ...c, ...fields, edited: true };
     _cleared.forEach(k => delete card[k]);
     return card;
   };
-  MC.CARDS.forEach((c, i) => { if (edits[c.id]) MC.CARDS[i] = applyEdit(c, edits[c.id]); });
-  read(NEW_KEY, '[]').forEach(c => { c.custom = true; MC.CARDS.push(c); });
-  reindex();
+
+  // ───────── shared state: { custom: Card[], edits: { [id]: Edit } } ─────────
+  let shared = read(CACHE_KEY, '{"custom":[],"edits":{}}');
+  let queue = read(QUEUE_KEY, '[]'); // [{ op: 'put' | 'delete', kind: 'custom' | 'edit', id, data? }]
+
+  // One-time migration: cards saved before sharing existed get queued for upload.
+  const legacyNew = read(LEGACY_NEW, '[]'), legacyEdit = read(LEGACY_EDIT, '{}');
+  if (legacyNew.length || Object.keys(legacyEdit).length) {
+    legacyNew.forEach(({ custom, ...c }) => queue.push({ op: 'put', kind: 'custom', id: c.id, data: c }));
+    Object.entries(legacyEdit).forEach(([id, e]) => queue.push({ op: 'put', kind: 'edit', id, data: e }));
+    write(QUEUE_KEY, queue); drop(LEGACY_NEW); drop(LEGACY_EDIT);
+  }
+
+  /** Apply a change to the local copy of the shared state. */
+  function applyOp(state, { op, kind, id, data }) {
+    if (kind === 'custom') {
+      state.custom = state.custom.filter(c => c.id !== id);
+      if (op === 'put') state.custom.push(data);
+    } else if (op === 'put') state.edits[id] = data;
+    else delete state.edits[id];
+  }
+
+  const listeners = [];
+  /** Views register here to re-render when the shared pool changes (e.g. someone else's card arrives). */
+  MC.onCardsChanged = fn => listeners.push(fn);
+
+  /** Rebuild MC.CARDS in place: built-ins (with edits) followed by custom cards. */
+  function rebuild() {
+    const view = JSON.parse(JSON.stringify(shared));
+    queue.forEach(o => applyOp(view, o)); // show not-yet-sent changes too
+    MC.CARDS.splice(0, MC.CARDS.length,
+      ...BASE.map(c => view.edits[c.id] ? applyEdit(c, view.edits[c.id]) : c),
+      ...view.custom.filter(c => !ORIGINAL[c.id]).map(c => ({ ...c, custom: true })));
+    reindex();
+  }
+  rebuild();
+
+  const online = () => /^https?:$/.test(location.protocol);
+  async function send({ op, kind, id, data }) {
+    const res = op === 'put'
+      ? await fetch(API, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind, id, data }) })
+      : await fetch(`${API}?kind=${kind}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const err = new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+      err.rejected = res.status === 400; // the store refused it; retrying won't help
+      throw err;
+    }
+  }
+
+  /** Send queued changes, then pull the latest shared pool. Returns true when the store was reached. */
+  let syncing = null;
+  MC.syncCards = function () {
+    if (!online()) return Promise.resolve(false);
+    return (syncing ||= (async () => {
+      try {
+        while (queue.length) {
+          try { await send(queue[0]); } catch (e) { if (!e.rejected) throw e; console.warn('Card change rejected:', e.message); }
+          queue.shift(); write(QUEUE_KEY, queue);
+        }
+        const res = await fetch(API, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const next = await res.json();
+        const changed = JSON.stringify(next) !== JSON.stringify(shared);
+        shared = next; write(CACHE_KEY, shared);
+        if (changed) { rebuild(); listeners.forEach(fn => fn()); }
+        return true;
+      } catch (e) {
+        console.warn('Card store unreachable, working from this device:', e.message);
+        return false;
+      } finally { syncing = null; }
+    })());
+  };
+
+  /** Record a change locally, then try to share it. Resolves true once it has reached the shared store. */
+  async function commit(op) {
+    queue.push(op); write(QUEUE_KEY, queue);
+    rebuild();
+    return MC.syncCards();
+  }
+
+  // Pull everyone's cards on load and whenever the tab comes back into view.
+  MC.syncCards();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) MC.syncCards(); });
 
   const MONSTER = ['basic', 'tribute', 'extra', 'boss'];
   const FIELDS = {
@@ -61,10 +144,11 @@
   }
 
   const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'card';
+  /** New cards get a short random suffix so two people naming a card the same way don't collide. */
   function newId(name) {
-    const base = slug(name);
-    let id = base, n = 2;
-    while (MC.byId[id]) id = `${base}-${n++}`;
+    const base = slug(name).slice(0, 60);
+    let id;
+    do id = `${base}-${Math.random().toString(36).slice(2, 6)}`; while (MC.byId[id]);
     return id;
   }
 
@@ -165,8 +249,8 @@
             </div>
             <textarea class="cc-code" readonly rows="4" hidden></textarea>
             <p class="cc-note">${builtin
-              ? 'Edits are saved in this browser and apply everywhere, including decks on the table. Use <b>Copy code</b> to update <code>data/cards.js</code> for good.'
-              : 'Custom cards are saved in this browser. Use <b>Copy code</b> to add one to <code>data/cards.js</code> for good.'}</p>
+              ? 'Edits are shared with everyone using the site and apply to decks on the table too. Use <b>Copy code</b> to update <code>data/cards.js</code> for good.'
+              : 'Custom cards are shared with everyone using the site. Use <b>Copy code</b> to add one to <code>data/cards.js</code> for good.'}</p>
           </div>
         </div>`, { wide: true });
 
@@ -182,7 +266,12 @@
       form.addEventListener('submit', e => e.preventDefault());
       update();
 
-      const finish = (card, msg) => { reindex(); MC.closeModal(); MC.toast(msg); onSaved?.(card); };
+      /** Close the creator now; tell the user whether the change reached everyone. */
+      const finish = (card, label, pending) => {
+        MC.closeModal(); onSaved?.(card);
+        pending.then(shared => MC.toast(shared ? `${label} — shared with everyone`
+          : `${label} on this device — it will be shared when the card server is reachable`));
+      };
 
       box.addEventListener('click', e => {
         const act = e.target.closest('[data-cc]')?.dataset.cc;
@@ -195,39 +284,26 @@
           return;
         }
         if (act === 'delete') {
-          write(NEW_KEY, read(NEW_KEY, '[]').filter(c => c.id !== editing));
-          MC.CARDS.splice(MC.CARDS.findIndex(c => c.id === editing), 1);
-          finish(null, 'Card deleted');
+          finish(null, `${base.name} deleted`, commit({ op: 'delete', kind: 'custom', id: editing }));
           return;
         }
         if (act === 'reset') {
-          const all = read(EDIT_KEY, '{}'); delete all[editing]; write(EDIT_KEY, all);
-          MC.CARDS[MC.CARDS.findIndex(c => c.id === editing)] = ORIGINAL[editing];
-          finish(ORIGINAL[editing], `${ORIGINAL[editing].name} reset`);
+          finish(ORIGINAL[editing], `${ORIGINAL[editing].name} reset`, commit({ op: 'delete', kind: 'edit', id: editing }));
           return;
         }
         // save
         if (!form.elements.name.value.trim()) { MC.toast('Give the card a name first'); form.elements.name.focus(); return; }
-        let ok;
         if (builtin) {
           const card = { ...build(form, editing, ORIGINAL[editing]), edited: true };
-          const all = read(EDIT_KEY, '{}');
           const { id, edited, ...fields } = card;
           // store only the form-owned fields (and flags) so engine extras still come from data/cards.js
-          all[editing] = Object.fromEntries(Object.entries(fields).filter(([k]) => FORM_KEYS.includes(k) || ['name', 'kind', 'flags'].includes(k)));
-          all[editing]._cleared = FORM_KEYS.filter(k => !(k in fields)); // e.g. ATK after turning a monster into an Action
-          ok = write(EDIT_KEY, all);
-          MC.CARDS[MC.CARDS.findIndex(c => c.id === editing)] = card;
-          finish(card, ok ? `${card.name} updated` : `${card.name} updated for this session (browser storage is blocked)`);
+          const edit = Object.fromEntries(Object.entries(fields).filter(([k]) => FORM_KEYS.includes(k) || ['name', 'kind', 'flags'].includes(k)));
+          edit._cleared = FORM_KEYS.filter(k => !(k in fields)); // e.g. ATK after turning a monster into an Action
+          finish(card, `${card.name} updated`, commit({ op: 'put', kind: 'edit', id: editing, data: edit }));
           return;
         }
-        const card = { ...build(form, editing || newId(form.elements.name.value), editing ? base : null), custom: true };
-        const stored = read(NEW_KEY, '[]').filter(c => c.id !== card.id);
-        stored.push(card);
-        ok = write(NEW_KEY, stored);
-        const i = MC.CARDS.findIndex(c => c.id === card.id);
-        if (i > -1) MC.CARDS[i] = card; else MC.CARDS.push(card);
-        finish(card, ok ? `${card.name} saved` : `${card.name} added for this session (browser storage is blocked)`);
+        const { custom, ...card } = build(form, editing || newId(form.elements.name.value), editing ? base : null);
+        finish(card, `${card.name} saved`, commit({ op: 'put', kind: 'custom', id: card.id, data: card }));
       });
     },
   };

@@ -1,0 +1,6 @@
+# Static site served from the repo root; the shared card store is a Netlify Function.
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
