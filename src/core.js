@@ -49,7 +49,9 @@
     Animal: ['.##...##.', '.##...##.', '.........', '##.....##', '##.###.##', '..#####..', '.#######.', '.#######.', '..##.##..'],
     Ice:    ['....#....', '.#..#..#.', '..#.#.#..', '...###...', '#########', '...###...', '..#.#.#..', '.#..#..#.', '....#....'],
     Steel:  ['...#.#...', '.#######.', '.##...##.', '###.#.###', '.#.###.#.', '###.#.###', '.##...##.', '.#######.', '...#.#...'],
-    Grass:  ['.........', '.#.....#.', '.#..#..#.', '.##.#.##.', '..#.#.#..', '..##.##..', '...###...', '...###...', '....#....'],
+    Parasite: ['...###...', '..#...#..', '.#..#..#.', '.#.#.#.#.', '.#.#...#.', '.#..###..', '..#......', '...#.....', '....#....'],
+    Curse:  ['....#....', '...#.#...', '..#...#..', '.#.###.#.', '#.##.##.#', '.#.###.#.', '..#...#..', '...#.#...', '....#....'],
+    Nature: ['.........', '.#.....#.', '.#..#..#.', '.##.#.##.', '..#.#.#..', '..##.##..', '...###...', '...###...', '....#....'],
     Infected: ['....#....', '.#..#..#.', '..#####..', '..##.##..', '###...###', '..##.##..', '..#####..', '.#..#..#.', '....#....'],
     // card-back emblems (9×9)
     main:    ['....#....', '...###...', '..##.##..', '.##...##.', '##..#..##', '.##...##.', '..##.##..', '...###...', '....#....'],
@@ -75,7 +77,10 @@
   };
 
   MC.TAG_COLORS = { Insect: '#3aa63a', Ant: '#e2582a', Fungus: '#d03aa8', Undead: '#7a6c94', Infected: '#d03aa8', Stone: '#8a7a66', Golem: '#5f6f86',
-    Fire: '#e8482a', Water: '#2a82e0', Arcane: '#9a4ae0', Light: '#e2b81e', Animal: '#b07a3a', Ice: '#4ac0e4', Steel: '#7a8aa0', Grass: '#46b034' };
+    Fire: '#e8482a', Water: '#2a82e0', Arcane: '#9a4ae0', Light: '#e2b81e', Animal: '#b07a3a', Ice: '#4ac0e4', Steel: '#7a8aa0', Nature: '#46b034',
+    Parasite: '#9aa82a', Curse: '#6a2a8a' };
+  /** Renamed tags: old name → new name (applied to every card, including shared ones). */
+  MC.TAG_ALIASES = { Grass: 'Nature' };
   /** Tag chip: icon only, the name slides out on hover. */
   MC.tagChip = t =>
     `<span class="tag" title="${MC.esc(t)}" style="--tc:${MC.TAG_COLORS[t] || '#555'}">${MC.icon(t)}<span class="tag-name">${MC.esc(t)}</span></span>`;
@@ -84,7 +89,8 @@
     `<span class="tag tag-fp" title="Footprint ${n}: blocks ${n - 1} neighbouring zone${n > 2 ? 's' : ''}">${MC.icon('foot')}<b>${n}</b></span>`;
 
   // Keywords that open an effect line ("SUMMON:" style in the reference UI).
-  const KEYWORDS = ['Once per turn', 'On Summon', 'On Destroy', 'On Tribute', 'Blocker', 'Unblockable', 'Summon', 'Rubble', 'Excavate', 'Boss Zone'];
+  const KEYWORDS = ['Once per turn', 'On Summon', 'On Destroy', 'On Tribute', 'Blocker', 'Unblockable', 'Summon', 'Rubble', 'Excavate', 'Boss Zone',
+    'On Attack', 'On Flip-Up', 'Start of your turn', 'End of your turn'];
   const KW_RE = new RegExp(`^(${KEYWORDS.join('|')})([:.])\\s*`, 'i');
   const byName = () => (MC._byName ||= Object.fromEntries(MC.CARDS.map(c => [c.name.toLowerCase(), c])));
   /** Escape text, turning "Card Name" references into pills in that card's type colour. */
@@ -101,6 +107,9 @@
   const PILL_DEFAULT = '#4a5a8a';
   const pillDither = {};
   function customPill(label, color) {
+    // [On Attack] etc. without a colour use that keyword's own default colours
+    const slug = label.trim().toLowerCase().replace(/\s+/g, '-');
+    if (!color && KW_COLORS[slug]) return `<b class="kw kw-${slug}">${MC.esc(label)}</b>`;
     let c = PILL_COLORS[(color || '').toLowerCase()];
     if (!c && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color || '')) c = color.length === 4 ? '#' + [...color.slice(1)].map(x => x + x).join('') : color;
     c ||= PILL_DEFAULT;
@@ -298,7 +307,9 @@
   const KW_COLORS = {
     'once-per-turn': ['#5a7cf0', '#9a5ee6'], 'on-summon': ['#2fa84a', '#26b8a6'],
     'on-destroy': ['#e8384c', '#f08a2a'], 'on-tribute': ['#e0a81e', '#f08a2a'],
-    'summon': ['#8a4ad8', '#e04cb8'], 'rubble': ['#7a6a56', '#a8987c'], 'excavate': ['#a0702e', '#d8a03a'], 'boss-zone': ['#6a3ab8', '#b06ae8'], 'blocker': ['#2f6be0', '#26b8a6'], 'unblockable': ['#f08a2a', '#e0b81e'],
+    'summon': ['#8a4ad8', '#e04cb8'], 'rubble': ['#7a6a56', '#a8987c'], 'excavate': ['#a0702e', '#d8a03a'], 'boss-zone': ['#6a3ab8', '#b06ae8'],
+    'on-attack': ['#d8342e', '#f07a2e'], 'on-flip-up': ['#1f8fb0', '#46d0c4'],
+    'start-of-your-turn': ['#e0842a', '#f0c83a'], 'end-of-your-turn': ['#33408f', '#6a52c4'], 'blocker': ['#2f6be0', '#26b8a6'], 'unblockable': ['#f08a2a', '#e0b81e'],
   };
   (function injectDitherCSS() {
     const css = [];

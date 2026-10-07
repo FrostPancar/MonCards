@@ -64,9 +64,12 @@
   function rebuild() {
     const view = JSON.parse(JSON.stringify(shared));
     queue.forEach(o => applyOp(view, o)); // show not-yet-sent changes too
+    // renamed tags (e.g. Grass → Nature) are mapped on every card, including ones already shared
+    const norm = c => c.tags?.some(t => MC.TAG_ALIASES[t])
+      ? { ...c, tags: [...new Set(c.tags.map(t => MC.TAG_ALIASES[t] || t))] } : c;
     MC.CARDS.splice(0, MC.CARDS.length,
-      ...BASE.map(c => view.edits[c.id] ? applyEdit(c, view.edits[c.id]) : c),
-      ...view.custom.filter(c => !ORIGINAL[c.id]).map(c => ({ ...c, custom: true })));
+      ...BASE.map(c => norm(view.edits[c.id] ? applyEdit(c, view.edits[c.id]) : c)),
+      ...view.custom.filter(c => !ORIGINAL[c.id]).map(c => norm({ ...c, custom: true })));
     reindex();
   }
   rebuild();
@@ -234,7 +237,7 @@
             </fieldset>
             ${field('Effect text', `<textarea name="text" rows="5" placeholder="On Summon: draw 1.">${MC.esc(b.text || '')}</textarea>`)}
             <p class="cc-help">One effect per line. Start a line with <b>Once per turn:</b>, <b>On Summon:</b>, <b>On Destroy:</b>,
-              <b>On Tribute:</b>, <b>Summon:</b>, <b>Rubble:</b>, <b>Boss Zone:</b>, <b>Blocker.</b> or <b>Unblockable.</b> for a keyword pill.
+              <b>On Tribute:</b>, <b>On Attack:</b>, <b>On Flip-Up:</b>, <b>Start of your turn:</b>, <b>End of your turn:</b>, <b>Summon:</b>, <b>Rubble:</b>, <b>Boss Zone:</b>, <b>Blocker.</b> or <b>Unblockable.</b> for a keyword pill.
               Put card names in "quotes" to turn them into pills.
               Make any word a keyword with <b>[Brackets]</b>, add a colour with <b>[Two Words]{red}</b>, or put a colour after a single word: <b>Frenzy{purple}</b>.
               Colours: red, orange, yellow, green, teal, blue, purple, pink, brown, gray, black or a #hex code.</p>

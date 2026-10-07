@@ -305,7 +305,9 @@ The frame color shows the card type (§6). Every card has a white rim and black 
 like a physical card.
 
 **Effect keywords** open a line when they fit: *Once per turn*, *On Summon*, *On Destroy*,
-*On Tribute*, *Summon* (how the card is summoned), *Blocker*, *Unblockable*.
+*On Tribute*, *On Attack*, *On Flip-Up*, *Start of your turn*, *End of your turn*, *Summon* (how the card is
+summoned), *Blocker*, *Unblockable*. Writing one of these in brackets anywhere, e.g. `[On Attack]`, gives it the
+same colours.
 
 Any other word can be styled as a keyword in card text: `[Frenzy]` makes a pill,
 `[Swarm Call]{red}` gives it a colour, and `Burning{orange}` colours a single word.
