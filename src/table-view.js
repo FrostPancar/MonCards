@@ -16,8 +16,6 @@
   const hasTag = (card, t) => (card.tags || []).includes(t);
 
   let S, root;
-  let pixel = 2;
-  try { const v = localStorage.getItem('mc-pixel'); if (v !== null) pixel = +v; } catch (e) { /* storage blocked */ }
 
   // ───────────────────────── State ─────────────────────────
   function newPlayer(deckKey, name) {
@@ -445,36 +443,6 @@
     log('Demo board loaded — turn 5, Player 1 Main Phase. Drag cards or click them.');
   }
 
-  /** Bedrock Golems vs Hive Queen, with Rubble already in the Barrier Zones. */
-  function demoGolem() {
-    newDuel('golem', 'hive');
-    const [a, b] = S.players;
-    a.field = { inst: a.fieldDeck.splice(0, 1)[0], faceDown: false };
-    b.field = { inst: b.fieldDeck.splice(0, 1)[0], faceDown: false };
-    a.monsters.push({ inst: take(a, 'granite-brute'), at: 0 });
-    a.monsters.push({ inst: take(a, 'cobble-guard'), at: 1 });
-    a.monsters.push({ inst: take(a, 'monolith-warden'), at: 3 });
-    a.actions[0] = { inst: take(a, 'rockfall'), faceDown: true };
-    a.barriers[0].faceDown = true; a.barriers[2].faceDown = true;
-    a.barriers[0].rubble = take(a, 'pebble-sprite');
-    a.barriers[2].rubble = take(a, 'geode-crawler');
-    a.barriers[3].rubble = take(a, 'basalt-sentinel');
-    a.gy.push(take(a, 'excavation'), take(a, 'quarry-worker'));
-    giveHand(a, 'crag-behemoth'); giveHand(a, 'excavation');
-
-    b.monsters.push({ inst: take(b, 'mantis'), at: 1 });
-    b.monsters.push({ inst: take(b, 'beetle-defender'), at: 3 });
-    b.monsters.push({ inst: b.extra.pop(), at: 5 });
-    b.actions[0] = { inst: take(b, 'swarm-frenzy'), faceDown: true };
-    b.barriers[1].faceDown = true;
-    b.gy.push(take(b, 'larva'), take(b, 'forage'));
-    a.lp = 4500; b.lp = 5500;
-    S.turn = 6; S.active = 0; S.phase = 2;
-    S.log = [];
-    log('Demo: Bedrock Golems vs Hive Queen — turn 6. Rubble sits on your Barrier Zones: Excavate it, or tribute it for Charge.');
-  }
-  let demoIndex = 0;
-  const DEMOS = [() => demoBoard(), () => demoGolem()];
 
   // ───────────────────────── Dialogs ─────────────────────────
   function newDuelDialog() {
@@ -690,17 +658,13 @@
     return `<div class="box plate ${S.active === pi ? 'is-active' : ''} ${direct ? 'target' : ''}" data-plate="${pi}">
       <span class="box-tab">${MC.esc(p.name)}${S.active === pi ? ' ▸' : ''}</span>
       <div class="plate-deck">${MC.esc(MC.DECKS[p.deckKey].name)}</div>
-      <div class="lp">${MC.icon('heart')}<b>${p.lp}</b><span>LP</span></div>
+      <label class="lp">${MC.icon('heart')}<input class="lp-input" type="number" min="0" step="100" value="${p.lp}"
+        data-lpinput="${pi}" aria-label="${MC.esc(p.name)} Life Points" title="Click to edit LP"><span>LP</span></label>
       <div class="lp-bar"><i style="width:${Math.min(100, p.lp / 60)}%"></i></div>
       <ul class="plate-counts">
         <li>Hand <b>${p.hand.length}</b></li><li>Deck <b>${p.deck.length}</b></li>
         <li>GY <b>${p.gy.length}</b></li><li>Barriers <b>${up}/4</b></li>
       </ul>
-      <div class="plate-btns">
-        <button class="btn btn-sm" data-lp="${pi}:-500">−500</button>
-        <button class="btn btn-sm" data-lp="${pi}:500">+500</button>
-        <button class="btn btn-sm" data-fdeck="${pi}">Field Deck</button>
-      </div>
       ${direct ? '<div class="direct-hint">▶ Click to attack directly</div>' : ''}
     </div>`;
   }
@@ -818,8 +782,6 @@
 
   function render() {
     if (!S) return;
-    root.classList.toggle('px-2', pixel === 2);
-    root.classList.toggle('px-3', pixel === 3);
     root.innerHTML = `
       <div class="table-layout">
         <aside class="hud">
@@ -830,10 +792,7 @@
             <div class="turn-btns">
               <button class="btn btn-sm" data-draw>Draw</button>
               <button class="btn btn-sm" data-newduel>New duel</button>
-              <button class="btn btn-sm" data-demo>Demo board</button>
             </div>
-            <div class="px-toggle"><span>Pixel filter</span>${[0, 2, 3].map(n =>
-              `<button class="btn btn-sm ${pixel === n ? 'on' : ''}" data-pixel="${n}">${n ? n + 'x' : 'Off'}</button>`).join('')}</div>
           </div>
           ${plateHTML(0)}
           <div class="box log"><span class="box-tab">Duel log</span>
@@ -1041,21 +1000,10 @@
     if ((el = btn('[data-next]'))) { nextPhase(); render(); return; }
     if ((el = btn('[data-draw]'))) { draw(P(S.active)); render(); return; }
     if ((el = btn('[data-newduel]'))) { newDuelDialog(); return; }
-    if ((el = btn('[data-demo]'))) { demoIndex = (demoIndex + 1) % DEMOS.length; DEMOS[demoIndex](); render(); return; }
-    if ((el = btn('[data-pixel]'))) {
-      pixel = +el.dataset.pixel;
-      try { localStorage.setItem('mc-pixel', pixel); } catch (err) { /* storage blocked */ }
-      render(); return;
-    }
     if ((el = btn('[data-cancel]'))) { S.mode = null; render(); return; }
     if ((el = btn('[data-pay-ok]'))) { confirmPay(); render(); return; }
     if ((el = btn('[data-prompt]'))) { const p = S.prompt; S.prompt = null; p.buttons[+el.dataset.prompt].run(); render(); return; }
     if ((el = btn('[data-peek]'))) { S.peek[+el.dataset.peek] = !S.peek[+el.dataset.peek]; render(); return; }
-    if ((el = btn('[data-lp]'))) {
-      const [pi, n] = el.dataset.lp.split(':').map(Number);
-      if (n < 0) loseLp(pi, -n, 'manual'); else { P(pi).lp += n; log(`${P(pi).name} gains ${n} LP.`); }
-      render(); return;
-    }
     if ((el = btn('[data-fdeck]'))) { pileDialog(+el.dataset.fdeck, 'fdeck'); return; }
     if ((el = btn('[data-do]'))) { doAction(el.dataset.do); return; }
 
@@ -1113,6 +1061,18 @@
       demoBoard();
       render();
       root.addEventListener('click', onClick);
+      // Life Points are edited by typing into the LP number.
+      root.addEventListener('change', e => {
+        const inp = e.target.closest('[data-lpinput]');
+        if (!inp) return;
+        const pi = +inp.dataset.lpinput, v = Math.max(0, Math.round(+inp.value || 0));
+        const p = P(pi);
+        if (v === p.lp) return;
+        if (v < p.lp) loseLp(pi, p.lp - v, 'edited');
+        else { log(`${p.name} gains ${v - p.lp} LP (edited).`); p.lp = v; }
+        render();
+      });
+      root.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-lpinput]')) e.target.blur(); });
       root.addEventListener('pointerdown', onPointerDown);
       // Card art is <img>; stop the browser's native image drag from hijacking ours.
       root.addEventListener('dragstart', e => e.preventDefault());

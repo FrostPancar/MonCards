@@ -75,7 +75,7 @@ Tribute monsters, Extra Deck monsters and Bosses have a **Footprint size**. The 
 itself still sits in **one** Monster Zone, but a monster with Footprint *N* makes *N − 1*
 neighbouring zones **unusable** (shown with 🚫) while it is on the field. For Footprint 3
 the blocked zones are on both sides; for Footprint 2 the zone to its right is blocked.
-You can't summon a monster if those zones aren't free. Basic monsters always have
+Footprint can be 1–6 (6 fills the whole Monster row). You can't summon a monster if those zones aren't free. Basic monsters always have
 Footprint 1.
 
 ---

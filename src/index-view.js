@@ -10,7 +10,7 @@
   // Per-viewer display options for index cards (remembered in this browser):
   //   hide-art  — hide the art icon, keep the card layout
   //   full-text — drop the art area so the effect text gets the room
-  const OPTS = { 'hide-art': 'mc-hide-art', 'full-text': 'mc-full-text' };
+  const OPTS = { 'hide-art': 'mc-hide-art', 'full-text': 'mc-full-text', dark: 'mc-dark' };
   const opt = {};
   for (const [cls, key] of Object.entries(OPTS)) {
     try { opt[cls] = localStorage.getItem(key) === '1'; } catch (e) { opt[cls] = false; }
@@ -141,6 +141,7 @@
       </div>
       <button class="chip ${opt['hide-art'] ? '' : 'on'}" data-opt="hide-art" aria-pressed="${!opt['hide-art']}">Art icons: ${opt['hide-art'] ? 'Off' : 'On'}</button>
       <button class="chip ${opt['full-text'] ? 'on' : ''}" data-opt="full-text" aria-pressed="${opt['full-text']}">Full text: ${opt['full-text'] ? 'On' : 'Off'}</button>
+      <button class="chip ${opt.dark ? 'on' : ''}" data-opt="dark" aria-pressed="${opt.dark}">${opt.dark ? '☾ Dark' : '☀ Light'}</button>
       <button class="btn btn-hot" data-create>+ Card Creator</button>`;
   }
 

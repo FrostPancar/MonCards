@@ -140,7 +140,7 @@
               ${field('Charge', `<input name="charge" type="number" min="0" max="12" value="${b.charge ?? 1}">`, 'charge')}
               ${field('Charge Cost', `<input name="cost" type="number" min="0" max="30" value="${b.cost ?? 5}">`, 'cost')}
               ${field('Set cost +', `<input name="setCost" type="number" min="0" value="${b.setCost ?? ''}" placeholder="?">`, 'setCost')}
-              ${field('Footprint', `<select name="footprint">${[1, 2, 3].map(n => opt(String(n), String(b.footprint ?? 1))).join('')}</select>`, 'footprint')}
+              ${field('Footprint', `<select name="footprint">${[1, 2, 3, 4, 5, 6].map(n => opt(String(n), String(b.footprint ?? 1))).join('')}</select>`, 'footprint')}
             </div>
             ${field('Summon style', `<select name="method">${['fusion', 'formation', 'charge', 'special', 'trigger'].map(m => opt(m, b.method ?? 'formation')).join('')}</select>`, 'method')}
             ${field('Archetype', `<input name="archetype" value="${MC.esc(b.archetype ?? '')}" placeholder="On Destroy, Blocker, Tag Bonus…">`, 'archetype')}

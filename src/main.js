@@ -43,30 +43,5 @@
   }
   window.addEventListener('hashchange', route);
 
-  /*
-   * Mosaic "pixel" filters. Each keeps one source pixel per n×n block, then
-   * smears it right and down with offset+merge so blocks tile exactly.
-   */
-  function pixelFilter(n) {
-    let f = `<filter id="px${n}" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
-      <feFlood x="0" y="0" width="1" height="1" flood-color="#fff" result="dot"/>
-      <feComposite in="dot" in2="dot" operator="over" x="0" y="0" width="${n}" height="${n}" result="cell"/>
-      <feTile in="cell" result="grid"/>
-      <feComposite in="SourceGraphic" in2="grid" operator="in" result="s0"/>`;
-    const mergeRun = (src, axis, out) => {
-      let nodes = `<feMergeNode in="${src}"/>`;
-      for (let i = 1; i < n; i++) {
-        f += `<feOffset in="${src}" ${axis}="${i}" result="${out}o${i}"/>`;
-        nodes += `<feMergeNode in="${out}o${i}"/>`;
-      }
-      f += `<feMerge result="${out}">${nodes}</feMerge>`;
-    };
-    mergeRun('s0', 'dx', 'h');
-    mergeRun('h', 'dy', 'v');
-    return f + '</filter>';
-  }
-  document.body.insertAdjacentHTML('beforeend',
-    `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${pixelFilter(2)}${pixelFilter(3)}</defs></svg>`);
-
   route();
 })();
