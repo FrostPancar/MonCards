@@ -769,16 +769,13 @@ body.dark[data-view="index"] .legal.ok { color: #7ee08f; border-color: #3c8a4a; 
 body.dark[data-view="index"] .legal.warn { color: #f2cf5a; border-color: #8a7420; }
 body.dark[data-view="index"] .legal.bad { color: #ff8090; border-color: #a03040; }
 
-/* card creator: tag order row */
-.cc-order { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 8px; margin-bottom: 2px; border-bottom: 2px dashed var(--ink-3); }
+/* card creator: tag order row (drag to reorder) */
+.cc-order { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-bottom: 8px; margin-bottom: 2px; border-bottom: 2px dashed var(--ink-3); touch-action: none; }
 .cc-order-label { font-size: 14px; color: var(--ink-2); margin-right: 2px; }
-.cc-ord {
-  display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; cursor: grab;
-  background: #fff; border: 2px solid var(--ink); border-radius: 8px; font-size: 14px; color: var(--ink);
-}
-.cc-ord .tag { font-size: 13px; }
-.cc-mv { font: inherit; font-size: 11px; line-height: 1; padding: 3px 5px; border: 2px solid var(--ink); border-radius: 5px; background: var(--paper-2); color: var(--ink); cursor: pointer; }
-.cc-mv[disabled] { opacity: .3; cursor: default; }
-.cc-first { font-family: var(--f-pixel); font-size: 9px; background: var(--yellow); color: var(--ink); border-radius: 4px; padding: 2px 4px; }
-body.dark[data-view="index"] .cc-ord { background: #262439; color: #ebe8ff; border-color: #4a4768; }
+.cc-ord { display: inline-flex; cursor: grab; user-select: none; -webkit-user-select: none; transition: transform .1s; }
+.cc-ord .tag { font-size: 16px; }
+.cc-order.dragging .tag { pointer-events: none; }          /* no hover-expanding names mid-drag */
+.cc-order-label + .cc-ord .tag { box-shadow: 0 0 0 2px var(--yellow); } /* first tag: drives art and colour */
+.cc-ord-held { opacity: .35; }
+.cc-ord-ghost { position: fixed; z-index: 300; pointer-events: none; cursor: grabbing; transform: scale(1.15) rotate(-4deg); filter: drop-shadow(0 6px 0 rgba(21, 20, 29, .3)); }
 body.dark[data-view="index"] .cc-order-label { color: #a9a5cc; }

@@ -273,42 +273,57 @@
       const form = box.querySelector('.cc-form');
       const preview = box.querySelector('.cc-card');
       const current = () => build(form, editing || 'preview', editing ? base : null);
-      // Tag order row: drag a tag, or use ◀ ▶, to choose which tag comes first.
+      // Tag order row: drag a tag icon to choose which tag comes first (pointer events, so touch works too).
       const orderBox = form.querySelector('.cc-order');
       const setOrder = tags => { form.elements.tagOrder.value = JSON.stringify(tags); };
       const renderOrder = () => {
         const tags = orderedTags(form);
         setOrder(tags);
         orderBox.innerHTML = tags.length
-          ? `<span class="cc-order-label">Order</span>` + tags.map((t, i) => `<span class="cc-ord" draggable="true" data-tag="${MC.esc(t)}">
-              <button type="button" class="cc-mv" data-mv="-1" ${i ? '' : 'disabled'} aria-label="Move ${MC.esc(t)} earlier">◀</button>
-              ${i === 0 ? '<b class="cc-first">1st</b>' : ''}${MC.tagChip(t)}<span>${MC.esc(t)}</span>
-              <button type="button" class="cc-mv" data-mv="1" ${i < tags.length - 1 ? '' : 'disabled'} aria-label="Move ${MC.esc(t)} later">▶</button></span>`).join('')
-          : '<span class="cc-order-label">Pick tags below — the first one sets the card art and colour.</span>';
+          ? `<span class="cc-order-label">Order</span>` + tags.map(t => `<span class="cc-ord" data-tag="${MC.esc(t)}">${MC.tagChip(t)}</span>`).join('')
+          : '<span class="cc-order-label">Pick tags below — drag to reorder; the first sets the card art and colour.</span>';
       };
-      const moveTag = (tag, to) => {
-        const tags = orderedTags(form).filter(t => t !== tag);
-        tags.splice(Math.max(0, Math.min(to, tags.length)), 0, tag);
-        setOrder(tags); renderOrder(); update();
-      };
-      orderBox.addEventListener('click', e => {
-        const mv = e.target.closest('[data-mv]');
-        if (!mv) return;
-        const tag = mv.closest('[data-tag]').dataset.tag;
-        moveTag(tag, orderedTags(form).indexOf(tag) + Number(mv.dataset.mv));
-      });
-      let dragTag = null;
-      orderBox.addEventListener('dragstart', e => {
-        dragTag = e.target.closest('[data-tag]')?.dataset.tag;
-        e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragTag || '');
-      });
-      orderBox.addEventListener('dragover', e => { if (dragTag) e.preventDefault(); });
-      orderBox.addEventListener('drop', e => {
+      let held = null; // { el, ghost, dx, dy }
+      orderBox.addEventListener('pointerdown', e => {
+        const el = e.target.closest('.cc-ord');
+        if (!el || e.button !== 0) return;
         e.preventDefault();
-        const over = e.target.closest('[data-tag]');
-        if (dragTag && over && over.dataset.tag !== dragTag) moveTag(dragTag, orderedTags(form).indexOf(over.dataset.tag));
-        dragTag = null;
+        const r = el.getBoundingClientRect();
+        const ghost = el.cloneNode(true);
+        ghost.classList.add('cc-ord-ghost');
+        Object.assign(ghost.style, { width: r.width + 'px', height: r.height + 'px', left: r.left + 'px', top: r.top + 'px' });
+        document.body.appendChild(ghost);
+        el.classList.add('cc-ord-held');
+        held = { el, ghost, dx: e.clientX - r.left, dy: e.clientY - r.top };
+        orderBox.classList.add('dragging');
+        orderBox.setPointerCapture(e.pointerId);
       });
+      orderBox.addEventListener('pointermove', e => {
+        if (!held) return;
+        held.ghost.style.left = (e.clientX - held.dx) + 'px';
+        held.ghost.style.top = (e.clientY - held.dy) + 'px';
+        // live preview: move the held tag in the row to where it would land
+        const others = [...orderBox.querySelectorAll('.cc-ord')].filter(x => x !== held.el);
+        const next = others.find(x => { const r = x.getBoundingClientRect(); return e.clientY < r.bottom && e.clientX < r.left + r.width / 2 || e.clientY < r.top; });
+        const before = held.el.nextElementSibling;
+        if (next) { if (before !== next) orderBox.insertBefore(held.el, next); }
+        else if (orderBox.lastElementChild !== held.el) orderBox.appendChild(held.el);
+        if (held.el.nextElementSibling !== before) { // order changed: preview the card with it too
+          setOrder([...orderBox.querySelectorAll('.cc-ord')].map(x => x.dataset.tag));
+          update();
+        }
+      });
+      const drop = () => {
+        if (!held) return;
+        held.ghost.remove();
+        orderBox.classList.remove('dragging');
+        held.el.classList.remove('cc-ord-held');
+        held = null;
+        setOrder([...orderBox.querySelectorAll('.cc-ord')].map(x => x.dataset.tag));
+        update();
+      };
+      orderBox.addEventListener('pointerup', drop);
+      orderBox.addEventListener('pointercancel', drop);
 
       const update = () => {
         const kind = form.elements.kind.value;
