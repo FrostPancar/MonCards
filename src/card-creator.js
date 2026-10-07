@@ -155,14 +155,25 @@
     return id;
   }
 
+  /** Tags ticked or typed in the form, in the order the user arranged them (first tag drives art and colour). */
+  function selectedTags(form) {
+    return [...new Set([...form.querySelectorAll('[name=tag]:checked')].map(x => x.value)
+      .concat((form.elements.moreTags?.value || '').split(',').map(t => t.trim()).filter(Boolean)))];
+  }
+  function orderedTags(form) {
+    const sel = selectedTags(form);
+    let order = [];
+    try { order = JSON.parse(form.elements.tagOrder?.value || '[]'); } catch (e) { /* malformed: fall back to selection order */ }
+    return order.filter(t => sel.includes(t)).concat(sel.filter(t => !order.includes(t)));
+  }
+
   /** Read the form into card fields (only what the form controls). */
   function readForm(form) {
     const v = n => form.elements[n]?.value ?? '';
     const num = n => v(n) === '' ? undefined : Number(v(n));
     const kind = v('kind');
     const on = f => FIELDS[f].includes(kind);
-    const tags = [...form.querySelectorAll('[name=tag]:checked')].map(x => x.value)
-      .concat(v('moreTags').split(',').map(t => t.trim()).filter(Boolean));
+    const tags = orderedTags(form);
     const card = { name: v('name').trim() || 'Untitled', kind };
     if (on('atk')) { card.atk = num('atk') ?? 0; card.def = num('def') ?? 0; }
     if (on('charge')) card.charge = num('charge') ?? 0;
@@ -232,6 +243,8 @@
             ${field('Summon style', `<select name="method">${['fusion', 'formation', 'charge', 'special', 'trigger'].map(m => opt(m, b.method ?? 'formation')).join('')}</select>`, 'method')}
             ${field('Archetype', `<input name="archetype" value="${MC.esc(b.archetype ?? '')}" placeholder="On Destroy, Blocker, Tag Bonus…">`, 'archetype')}
             <fieldset class="cc-tags"><legend>Tags</legend>
+              <input type="hidden" name="tagOrder" value="${MC.esc(JSON.stringify(b.tags || []))}">
+              <div class="cc-order" aria-label="Tag order"></div>
               ${KNOWN_TAGS.map(t => `<label class="cc-tag"><input type="checkbox" name="tag" value="${t}" ${(b.tags || []).includes(t) ? 'checked' : ''}>${MC.tagChip(t)}<span>${t}</span></label>`).join('')}
               <input name="moreTags" placeholder="Other tags, comma separated" value="${MC.esc((b.tags || []).filter(t => !KNOWN_TAGS.includes(t)).join(', '))}">
             </fieldset>
@@ -260,12 +273,50 @@
       const form = box.querySelector('.cc-form');
       const preview = box.querySelector('.cc-card');
       const current = () => build(form, editing || 'preview', editing ? base : null);
+      // Tag order row: drag a tag, or use ◀ ▶, to choose which tag comes first.
+      const orderBox = form.querySelector('.cc-order');
+      const setOrder = tags => { form.elements.tagOrder.value = JSON.stringify(tags); };
+      const renderOrder = () => {
+        const tags = orderedTags(form);
+        setOrder(tags);
+        orderBox.innerHTML = tags.length
+          ? `<span class="cc-order-label">Order</span>` + tags.map((t, i) => `<span class="cc-ord" draggable="true" data-tag="${MC.esc(t)}">
+              <button type="button" class="cc-mv" data-mv="-1" ${i ? '' : 'disabled'} aria-label="Move ${MC.esc(t)} earlier">◀</button>
+              ${i === 0 ? '<b class="cc-first">1st</b>' : ''}${MC.tagChip(t)}<span>${MC.esc(t)}</span>
+              <button type="button" class="cc-mv" data-mv="1" ${i < tags.length - 1 ? '' : 'disabled'} aria-label="Move ${MC.esc(t)} later">▶</button></span>`).join('')
+          : '<span class="cc-order-label">Pick tags below — the first one sets the card art and colour.</span>';
+      };
+      const moveTag = (tag, to) => {
+        const tags = orderedTags(form).filter(t => t !== tag);
+        tags.splice(Math.max(0, Math.min(to, tags.length)), 0, tag);
+        setOrder(tags); renderOrder(); update();
+      };
+      orderBox.addEventListener('click', e => {
+        const mv = e.target.closest('[data-mv]');
+        if (!mv) return;
+        const tag = mv.closest('[data-tag]').dataset.tag;
+        moveTag(tag, orderedTags(form).indexOf(tag) + Number(mv.dataset.mv));
+      });
+      let dragTag = null;
+      orderBox.addEventListener('dragstart', e => {
+        dragTag = e.target.closest('[data-tag]')?.dataset.tag;
+        e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragTag || '');
+      });
+      orderBox.addEventListener('dragover', e => { if (dragTag) e.preventDefault(); });
+      orderBox.addEventListener('drop', e => {
+        e.preventDefault();
+        const over = e.target.closest('[data-tag]');
+        if (dragTag && over && over.dataset.tag !== dragTag) moveTag(dragTag, orderedTags(form).indexOf(over.dataset.tag));
+        dragTag = null;
+      });
+
       const update = () => {
         const kind = form.elements.kind.value;
         form.querySelectorAll('[data-for]').forEach(el => { el.hidden = !FIELDS[el.dataset.for].includes(kind); });
         preview.innerHTML = MC.renderCard(current(), { extraClass: 'card-xl' });
       };
-      form.addEventListener('input', update);
+      form.addEventListener('input', e => { if (e.target.matches('[name=tag], [name=moreTags]')) renderOrder(); update(); });
+      renderOrder();
       form.addEventListener('submit', e => e.preventDefault());
       update();
 
