@@ -1,7 +1,28 @@
 /* Card Index: browse every card, filter by kind / tag / deck, check deck legality. */
 (function () {
   const MC = window.MC;
-  const state = { q: '', kind: 'all', deck: 'all', tag: 'all' };
+  const state = { q: '', kind: 'all', deck: 'all', tag: 'all', sort: 'type' };
+
+  /** Sort orders. Cards without a date (untouched built-ins) go last, in type order. */
+  const byType = (a, b) => MC.KIND_ORDER.indexOf(a.kind) - MC.KIND_ORDER.indexOf(b.kind) || a.name.localeCompare(b.name);
+  const newest = field => (a, b) => (b[field] || 0) - (a[field] || 0) || byType(a, b);
+  const SORTS = {
+    type: ['Type', byType],
+    name: ['Name', (a, b) => a.name.localeCompare(b.name)],
+    edited: ['Latest edits', newest('updatedAt')],
+    added: ['Latest adds', newest('createdAt')],
+  };
+
+  /** "12 Oct 2026, 14:05 (3 days ago)" */
+  function when(ms) {
+    if (!ms) return null;
+    const d = new Date(ms);
+    const abs = d.toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const s = Math.round((Date.now() - ms) / 1000);
+    const rel = s < 60 ? 'just now' : s < 3600 ? `${Math.floor(s / 60)} min ago` : s < 86400 ? `${Math.floor(s / 3600)} h ago`
+      : `${Math.floor(s / 86400)} day${s < 172800 ? '' : 's'} ago`;
+    return `${abs} (${rel})`;
+  }
   let root;
 
   const allTags = () => [...new Set(MC.CARDS.flatMap(c => [...(c.tags || []), ...(c.keywords || [])]))].sort();
@@ -55,7 +76,7 @@
     const out = root.querySelector('.index-body');
     if (state.deck === 'all') {
       const cards = MC.CARDS.filter(matches)
-        .sort((a, b) => MC.KIND_ORDER.indexOf(a.kind) - MC.KIND_ORDER.indexOf(b.kind) || a.name.localeCompare(b.name));
+        .sort(SORTS[state.sort][1]);
       out.innerHTML = `<p class="result-count">${cards.length} card${cards.length === 1 ? '' : 's'}</p>
         <div class="card-grid">${cards.map(c => cell(c)).join('') || '<p class="empty">No cards match.</p>'}</div>
         <h3 class="sec-title">Card backs</h3>
@@ -67,6 +88,7 @@
     const { errors, warnings } = MC.validateDeck(deck);
     const sections = deckSections(deck).map(([title, list]) => {
       const shown = list.filter(([id]) => matches(MC.byId[id]));
+      if (state.sort !== 'type') shown.sort(([a], [b]) => SORTS[state.sort][1](MC.byId[a], MC.byId[b]));
       if (!shown.length) return '';
       return `<h3 class="sec-title">${title} <small>${MC.count(list)}</small></h3>
         <div class="card-grid">${shown.map(([id, n]) => cell(MC.byId[id], n)).join('')}</div>`;
@@ -104,6 +126,8 @@
       MC.isMonster(c) && c.kind !== 'basic' ? ['Footprint', c.footprint || 1] : null,
       c.archetype ? ['Archetype', c.archetype] : null,
       c.limit === Infinity ? ['Copy limit', 'Unlimited'] : null,
+      c.custom ? ['Added', when(c.createdAt) || 'Unknown'] : null,
+      ['Last edited', when(c.updatedAt) || (c.custom || c.edited ? 'Unknown' : 'Never — original card')],
     ].filter(Boolean);
     MC.modal(`<div class="detail">
       <div class="detail-card">${MC.renderCard(c, { extraClass: 'card-xl' })}</div>
@@ -133,6 +157,9 @@
         <label>Deck <select data-sel="deck">
           <option value="all">All cards</option>
           ${Object.entries(MC.DECKS).map(([k, d]) => `<option value="${k}" ${state.deck === k ? 'selected' : ''}>${MC.esc(d.name)}</option>`).join('')}
+        </select></label>
+        <label>Sort <select data-sel="sort">
+          ${Object.entries(SORTS).map(([k, [label]]) => `<option value="${k}" ${state.sort === k ? 'selected' : ''}>${label}</option>`).join('')}
         </select></label>
         <label>Tag <select data-sel="tag">
           <option value="all">Any tag</option>

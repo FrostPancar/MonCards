@@ -185,7 +185,7 @@
 
   /** The card as a JS literal for data/cards.js. */
   function toCode(card) {
-    const { custom, edited, ...c } = card;
+    const { custom, edited, createdAt, updatedAt, ...c } = card;
     return '  ' + JSON.stringify(c, (k, v) => v === Infinity ? '__INF__' : v)
       .replace(/"__INF__"/g, 'Infinity')
       .replace(/"([a-zA-Z]+)":/g, '$1: ').replace(/,(?=[a-z]+: )/g, ', ') + ',';
@@ -299,10 +299,13 @@
           // store only the form-owned fields (and flags) so engine extras still come from data/cards.js
           const edit = Object.fromEntries(Object.entries(fields).filter(([k]) => FORM_KEYS.includes(k) || ['name', 'kind', 'flags'].includes(k)));
           edit._cleared = FORM_KEYS.filter(k => !(k in fields)); // e.g. ATK after turning a monster into an Action
+          edit.updatedAt = Date.now(); // the store re-stamps this with server time
           finish(card, `${card.name} updated`, commit({ op: 'put', kind: 'edit', id: editing, data: edit }));
           return;
         }
         const { custom, ...card } = build(form, editing || newId(form.elements.name.value), editing ? base : null);
+        card.updatedAt = Date.now(); // the store re-stamps these with server time
+        if (!editing) card.createdAt = card.updatedAt;
         finish(card, `${card.name} saved`, commit({ op: 'put', kind: 'custom', id: card.id, data: card }));
       });
     },

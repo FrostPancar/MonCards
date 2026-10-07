@@ -4,6 +4,7 @@
  *
  *   GET    /api/cards                      → { custom: Card[], edits: { [id]: Edit } }
  *   PUT    /api/cards   { kind, id, data } → save one custom card or one edit
+ *                                            (stamps updatedAt, and createdAt for new custom cards)
  *   DELETE /api/cards?kind=…&id=…          → remove one custom card or one edit
  *
  * Each card / edit is its own blob ("custom/<id>", "edit/<id>"), so people
@@ -69,8 +70,14 @@ export default async (req: Request) => {
     if (keyErr) return bad(keyErr)
     const dataErr = checkData(body.kind as Kind, body.id as string, body.data)
     if (dataErr) return bad(dataErr)
-    await s.setJSON(`${body.kind}/${body.id}`, body.data)
-    return json({ ok: true })
+    // Timestamps come from the server so every device agrees on them.
+    const key = `${body.kind}/${body.id}`
+    const now = Date.now()
+    const prev = (await s.get(key, { type: "json" })) as { createdAt?: number } | null
+    const data = { ...(body.data as Record<string, unknown>), updatedAt: now } as Record<string, unknown>
+    if (body.kind === "custom") data.createdAt = prev?.createdAt ?? (Number(data.createdAt) || now)
+    await s.setJSON(key, data)
+    return json({ ok: true, updatedAt: now })
   }
 
   if (req.method === "DELETE") {
