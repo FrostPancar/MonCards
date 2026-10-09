@@ -776,6 +776,8 @@ h1, h2, h3, h4 { font-family: var(--f-body); font-weight: 700; margin: 0; }
 
 /* Index display options (all card types) */
 body.hide-art[data-view="index"] .card .c-art > * { visibility: hidden; }   /* art icon hidden, layout unchanged */
+/* the same toggle hides the art icon on mini cards (table, hands, deck builder) and the dialog portrait */
+body.hide-art .mini .m-art > .art-ph, body.hide-art .portrait > .art-ph { visibility: hidden; }
 body.full-text[data-view="index"] .card .c-art { display: none; }            /* art area removed, text gets the room */
 .detail-btns { display: flex; gap: 10px; flex-wrap: wrap; }
 
