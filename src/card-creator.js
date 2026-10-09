@@ -132,7 +132,7 @@
     archetype: ['barrier'],
   };
   // Stats the form owns: cleared from an edited card when its new type doesn't use them.
-  const FORM_KEYS = ['atk', 'def', 'charge', 'cost', 'setCost', 'footprint', 'method', 'archetype', 'tags', 'text'];
+  const FORM_KEYS = ['atk', 'def', 'charge', 'cost', 'setCost', 'footprint', 'method', 'archetype', 'tags', 'roles', 'text'];
   const KNOWN_TAGS = Object.keys(MC.TAG_COLORS).filter(t => t !== 'Infected');
   const TEXT_FLAGS = ['blocker', 'unblockable', 'rubble'];
 
@@ -183,6 +183,8 @@
     if (on('method')) card.method = v('method');
     if (on('archetype')) card.archetype = v('archetype').trim() || 'On Destroy';
     if (tags.length) card.tags = [...new Set(tags)];
+    const roles = Object.keys(MC.ROLES).filter(r => form.querySelector(`[name=role][value="${r}"]`)?.checked);
+    if (roles.length) card.roles = roles;
     card.text = v('text').trim();
     return card;
   }
@@ -247,6 +249,9 @@
               <div class="cc-order" aria-label="Tag order"></div>
               ${KNOWN_TAGS.map(t => `<label class="cc-tag"><input type="checkbox" name="tag" value="${t}" ${(b.tags || []).includes(t) ? 'checked' : ''}>${MC.tagChip(t)}<span>${t}</span></label>`).join('')}
               <input name="moreTags" placeholder="Other tags, comma separated" value="${MC.esc((b.tags || []).filter(t => !KNOWN_TAGS.includes(t)).join(', '))}">
+            </fieldset>
+            <fieldset class="cc-tags cc-roles"><legend>Roles <small>(playstyle, for the Deck Builder's flavor chart)</small></legend>
+              ${Object.entries(MC.ROLES).map(([r, d]) => `<label class="cc-tag" title="${MC.esc(d)}"><input type="checkbox" name="role" value="${r}" ${(b.roles || []).includes(r) ? 'checked' : ''}><span>${r}</span></label>`).join('')}
             </fieldset>
             ${field('Effect text', `<textarea name="text" rows="5" placeholder="On Summon: draw 1.">${MC.esc(b.text || '')}</textarea>`)}
             <p class="cc-help">One effect per line. Start a line with <b>Once per turn:</b>, <b>On Summon:</b>, <b>On Destroy:</b>,

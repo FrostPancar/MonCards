@@ -58,7 +58,7 @@
     if (state.kind !== 'all' && card.kind !== state.kind) return false;
     if (state.tag !== 'all' && ![...(card.tags || []), ...(card.keywords || [])].includes(state.tag)) return false;
     if (state.q) {
-      const hay = [card.name, card.text, card.archetype, ...(card.tags || []), ...(card.keywords || [])].join(' ').toLowerCase();
+      const hay = [card.name, card.text, card.archetype, ...(card.tags || []), ...(card.keywords || []), ...(card.roles || [])].join(' ').toLowerCase();
       if (!hay.includes(state.q.toLowerCase())) return false;
     }
     return true;
@@ -119,6 +119,7 @@
       ['Kind', MC.KINDS[c.kind].long],
       c.tags?.length ? ['Tags', c.tags.join(', ')] : null,
       c.keywords?.length ? ['Keywords', c.keywords.join(', ')] : null,
+      c.roles?.length ? ['Roles', c.roles.join(', ')] : null,
       MC.isMonster(c) ? ['ATK / DEF', `${c.atk} / ${c.def}`] : null,
       c.charge != null ? ['Charge', { html: MC.chargePips(c.charge) }] : null,
       c.cost != null ? ['Charge Cost', c.cost] : null,

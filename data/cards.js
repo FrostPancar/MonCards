@@ -14,6 +14,8 @@
  *   setCost    extra cost when an Action is set and used on the opponent's turn (null = not decided)
  *   footprint  monster zones covered (tribute / extra / boss), default 1
  *   tags       array of Tags (there are no Types)
+ *   roles      playstyle tags for the Deck Builder's flavor chart: Swarm, Destruction, Buff/Debuff,
+ *              Fortitude, Consistency, Draw (any card kind; see MC.ROLES in core.js)
  *   keywords   rules keywords shown as chips: 'Blocker', 'Unblockable'
  *   archetype  barrier archetype label
  *   text       effect text (newline-separated)
@@ -29,7 +31,7 @@ window.MC = window.MC || {};
 MC.CARDS = [
   // ───────────────────────── Bosses ─────────────────────────
   {
-    id: 'hive-queen', name: 'Hive Queen', kind: 'boss',
+    id: 'hive-queen', name: 'Hive Queen', kind: 'boss', roles: ['Swarm', 'Fortitude'],
     atk: 3000, def: 3000, footprint: 3, tags: ['Insect'],
     text:
       'When your Insects are sent from the field to the GY, put them under this card instead.\n' +
@@ -39,7 +41,7 @@ MC.CARDS = [
       'When this card would be destroyed, you can tribute another Insect instead.',
   },
   {
-    id: 'brain-eating-fungus', name: 'Brain-Eating Fungus', kind: 'boss',
+    id: 'brain-eating-fungus', name: 'Brain-Eating Fungus', kind: 'boss', roles: ['Buff/Debuff'],
     atk: 100, def: 100, footprint: 1, tags: ['Fungus', 'Undead'],
     text:
       'Once per turn: Infect an Insect on your field; it gains Charge equal to the number of Infected Insects on your field.\n' +
@@ -52,7 +54,7 @@ MC.CARDS = [
 
   // ───────────────────────── Extra Deck ─────────────────────────
   {
-    id: 'insect-shell', name: 'Insect Shell', kind: 'extra', method: 'trigger',
+    id: 'insect-shell', name: 'Insect Shell', kind: 'extra', roles: ['Swarm'], method: 'trigger',
     atk: 100, def: 100, footprint: 1, tags: ['Insect'], limit: Infinity,
     flags: { noAttack: true, noBattleLpLoss: true },
     text:
@@ -64,13 +66,13 @@ MC.CARDS = [
   // ───────────────────── Hive Queen deck: Basics ─────────────────────
   { id: 'beatstick-bug', name: 'Beatstick Bug', kind: 'basic',
     atk: 1500, def: 1500, charge: 0, tags: ['Insect'], text: '' },
-  { id: 'beetle-defender', name: 'Beetle Defender', kind: 'basic',
+  { id: 'beetle-defender', name: 'Beetle Defender', kind: 'basic', roles: ['Fortitude'],
     atk: 1000, def: 1500, charge: 1, tags: ['Insect'], keywords: ['Blocker'], flags: { blocker: true },
     text: 'Blocker.' },
   { id: 'larva', name: 'Larva', kind: 'basic',
     atk: 100, def: 100, charge: 3, tags: ['Insect'], chargeBonus: { insectTribute: 2 },
     text: 'On Tribute: +2 Charge when tributed for an Insect monster.' },
-  { id: 'dung-beetle', name: 'Dung Beetle', kind: 'basic',
+  { id: 'dung-beetle', name: 'Dung Beetle', kind: 'basic', roles: ['Buff/Debuff'],
     atk: 1200, def: 1000, charge: 2, tags: ['Insect'], aura: { shellCharge: 2 },
     text: '"Insect Shell"s on your field get +2 Charge.' },
   { id: 'silkworm', name: 'Silkworm', kind: 'basic',
@@ -84,44 +86,44 @@ MC.CARDS = [
   { id: 'moth', name: 'Moth', kind: 'tribute',
     atk: 1500, def: 1500, charge: 3, cost: 5, footprint: 1, tags: ['Insect'],
     text: 'On Summon: you can play an Insect Action card without paying its cost.' },
-  { id: 'wasp', name: 'Wasp', kind: 'tribute',
+  { id: 'wasp', name: 'Wasp', kind: 'tribute', roles: ['Destruction'],
     atk: 2000, def: 1000, charge: 3, cost: 6, footprint: 1, tags: ['Insect'],
     text: 'You can tribute this card to destroy 1 of your opponent\'s monsters.' },
-  { id: 'cicada', name: 'Cicada', kind: 'tribute',
+  { id: 'cicada', name: 'Cicada', kind: 'tribute', roles: ['Buff/Debuff', 'Draw'],
     atk: 2000, def: 2500, charge: 3, cost: 7, footprint: 1, tags: ['Insect'], aura: { shellCharge: 2 },
     text: '"Insect Shell"s gain +2 Charge.\nWhen an Insect is Tribute Summoned: draw 2.' },
 
   // ───────────────────── Hive Queen deck: Actions (working titles) ─────────────────────
-  { id: 'forage', name: 'Forage', kind: 'action',
+  { id: 'forage', name: 'Forage', kind: 'action', roles: ['Consistency'],
     charge: 2, cost: 0, setCost: null, tags: ['Insect'],
     text: 'Add 1 Insect from your Deck to your hand.' },
-  { id: 'molt', name: 'Molt', kind: 'action',
+  { id: 'molt', name: 'Molt', kind: 'action', roles: ['Draw'],
     charge: 2, cost: 0, setCost: 2, tags: ['Insect'],
     text: 'Tribute 1 Insect: draw 2.' },
-  { id: 'paralytic-sting', name: 'Paralytic Sting', kind: 'action',
+  { id: 'paralytic-sting', name: 'Paralytic Sting', kind: 'action', roles: ['Buff/Debuff'],
     charge: 2, cost: 2, setCost: 4, tags: ['Insect'],
     text: 'Tribute 1 Insect: negate a monster\'s effects.' },
-  { id: 'swarm-frenzy', name: 'Swarm Frenzy', kind: 'action',
+  { id: 'swarm-frenzy', name: 'Swarm Frenzy', kind: 'action', roles: ['Buff/Debuff'],
     charge: 2, cost: 2, setCost: 2, tags: ['Insect'],
     text: 'Your Insects gain 1000 ATK this turn.' },
-  { id: 'chew-through', name: 'Chew Through', kind: 'action',
+  { id: 'chew-through', name: 'Chew Through', kind: 'action', roles: ['Destruction'],
     charge: 2, cost: 0, setCost: null, tags: ['Insect'],
     text: 'Tribute 1 Insect: destroy 1 Action card, OR pay +2 cost to flip your opponent\'s Field card face-down until end of turn.' },
 
   // ───────────────────── Fungus deck: Basics (Ants) ─────────────────────
-  { id: 'door-head-ant', name: 'Door Head Ant', kind: 'basic',
+  { id: 'door-head-ant', name: 'Door Head Ant', kind: 'basic', roles: ['Fortitude'],
     atk: 800, def: 1000, charge: 2, tags: ['Insect', 'Ant'], keywords: ['Blocker'], flags: { blocker: true },
     text: 'Blocker.' },
-  { id: 'soldier-ant', name: 'Soldier Ant', kind: 'basic',
+  { id: 'soldier-ant', name: 'Soldier Ant', kind: 'basic', roles: ['Fortitude'],
     atk: 1200, def: 1200, charge: 0, tags: ['Insect', 'Ant'], keywords: ['Blocker'], flags: { blocker: true },
     text: 'Blocker.' },
-  { id: 'worker-ant', name: 'Worker Ant', kind: 'basic',
+  { id: 'worker-ant', name: 'Worker Ant', kind: 'basic', roles: ['Draw'],
     atk: 500, def: 500, charge: 2, tags: ['Insect', 'Ant'],
     text: 'On Summon: draw 1.' },
-  { id: 'ant-larva', name: 'Ant Larva', kind: 'basic',
+  { id: 'ant-larva', name: 'Ant Larva', kind: 'basic', roles: ['Consistency'],
     atk: 100, def: 100, charge: 3, tags: ['Insect', 'Ant'],
     text: 'On Summon: add 1 Ant from your Deck to your hand.' },
-  { id: 'fire-ant', name: 'Fire Ant', kind: 'basic',
+  { id: 'fire-ant', name: 'Fire Ant', kind: 'basic', roles: ['Buff/Debuff'],
     atk: 500, def: 500, charge: 1, tags: ['Insect', 'Ant'],
     text: 'Tribute this card and target 1 of your opponent\'s monsters: it can\'t be tributed or attack until the end of your opponent\'s turn.\nCan be used to target Infected monsters during your opponent\'s turn.' },
   { id: 'flying-ant', name: 'Flying Ant', kind: 'basic',
@@ -129,56 +131,56 @@ MC.CARDS = [
     text: 'Unblockable.' },
 
   // ───────────────────── Fungus deck: Tributes ─────────────────────
-  { id: 'big-bad', name: 'Big Bad', kind: 'tribute',
+  { id: 'big-bad', name: 'Big Bad', kind: 'tribute', roles: ['Destruction'],
     atk: 3000, def: 2500, charge: 4, cost: 12, footprint: 2, tags: ['Insect'],
     text: 'Once per turn: destroy 1 monster and 1 Action card.' },
-  { id: 'stalls-bff', name: 'Stalls BFF', kind: 'tribute',
+  { id: 'stalls-bff', name: 'Stalls BFF', kind: 'tribute', roles: ['Destruction'],
     atk: 2000, def: 2500, charge: 2, cost: 8, footprint: 1, tags: ['Insect', 'Ant'],
     text: 'Once per turn: tribute a monster to flip 1 of your Barriers face-up, then you can destroy 1 Basic monster.' },
-  { id: 'emperor', name: 'Emperor', kind: 'tribute',
+  { id: 'emperor', name: 'Emperor', kind: 'tribute', roles: ['Buff/Debuff'],
     atk: 3200, def: 2500, charge: 4, cost: 18, footprint: 2, tags: ['Insect', 'Ant'],
     text: 'On Summon: your opponent can\'t use Action cards until the end of their turn, and negate all their non-Boss monster effects until the end of your turn.' },
 
   // ───────────────────── Fungus deck: Actions (working titles) ─────────────────────
-  { id: 'spore-cloud', name: 'Spore Cloud', kind: 'action',
+  { id: 'spore-cloud', name: 'Spore Cloud', kind: 'action', roles: ['Buff/Debuff'],
     charge: 2, cost: 0, setCost: 2, tags: ['Fungus'],
     text: 'Infect 1 monster on the field.' },
-  { id: 'rot', name: 'Rot', kind: 'action',
+  { id: 'rot', name: 'Rot', kind: 'action', roles: ['Destruction'],
     charge: 2, cost: 2, setCost: 2, tags: ['Fungus'],
     text: 'Destroy 1 Infected monster.' },
   { id: 'hivemind-veto', name: 'Hivemind Veto', kind: 'action',
     charge: 0, cost: 4, setCost: null, tags: ['Fungus'],
     text: 'Tribute 1 Infected monster: negate an Action card activation.' },
-  { id: 'puppet-strings', name: 'Puppet Strings', kind: 'action',
+  { id: 'puppet-strings', name: 'Puppet Strings', kind: 'action', roles: ['Fortitude'],
     charge: 0, cost: 4, setCost: null, tags: ['Fungus'],
     text: 'When your opponent attacks: change the attack target to an Infected monster.' },
-  { id: 'fungal-mending', name: 'Fungal Mending', kind: 'action',
+  { id: 'fungal-mending', name: 'Fungal Mending', kind: 'action', roles: ['Fortitude'],
     charge: 2, cost: 4, setCost: null, tags: ['Fungus'],
     text: 'Activate when your monster would be destroyed: it is not destroyed.' },
-  { id: 'total-bloom', name: 'Total Bloom', kind: 'action',
+  { id: 'total-bloom', name: 'Total Bloom', kind: 'action', roles: ['Destruction'],
     charge: 2, cost: 20, setCost: null, tags: ['Fungus'],
     text: 'Destroy all cards your opponent controls on the field.' },
 
   // ───────────────────────── Field cards ─────────────────────────
-  { id: 'lamp', name: 'Lamp', kind: 'field',
+  { id: 'lamp', name: 'Lamp', kind: 'field', roles: ['Consistency', 'Swarm'],
     text: 'Once per turn: reveal the top 5 cards of your Deck and play 1 Basic Insect among them.' },
-  { id: 'royal-nursery', name: 'Royal Nursery', kind: 'field',      // working title
+  { id: 'royal-nursery', name: 'Royal Nursery', kind: 'field', roles: ['Consistency'],      // working title
     text: 'Once per turn: when an Insect is summoned, add 1 Insect from your Deck to your hand.' },
-  { id: 'brood-chamber', name: 'Brood Chamber', kind: 'field',      // working title
+  { id: 'brood-chamber', name: 'Brood Chamber', kind: 'field', roles: ['Consistency'],      // working title
     text: 'When an Insect you control is destroyed: add 1 Insect from your Deck to your hand.' },
-  { id: 'offering-pit', name: 'Offering Pit', kind: 'field',        // working title
+  { id: 'offering-pit', name: 'Offering Pit', kind: 'field', roles: ['Draw'],        // working title
     text: 'Destroy 1 Insect you control: draw 2.' },
-  { id: 'ant-trail', name: 'Ant Trail', kind: 'field',              // working title
+  { id: 'ant-trail', name: 'Ant Trail', kind: 'field', roles: ['Draw'],              // working title
     text: 'Shuffle 1 Ant from your hand into your Deck: draw 2.' },
-  { id: 'spore-vent', name: 'Spore Vent', kind: 'field',            // working title
+  { id: 'spore-vent', name: 'Spore Vent', kind: 'field', roles: ['Buff/Debuff'],            // working title
     text: 'Tribute 1 Infected Ant: Infect 1 of your opponent\'s monsters.' },
-  { id: 'rotting-grove', name: 'Rotting Grove', kind: 'field',      // working title
+  { id: 'rotting-grove', name: 'Rotting Grove', kind: 'field', roles: ['Buff/Debuff'],      // working title
     text: 'Infected non-Ant monsters lose an extra 100 ATK for each Infected monster on the field.' },
 
   // ───────────────────────── Barrier cards ─────────────────────────
-  { id: 'cocoon', name: 'Cocoon', kind: 'barrier', archetype: 'On Destroy', onBreak: 'summonShell',
+  { id: 'cocoon', name: 'Cocoon', kind: 'barrier', roles: ['Swarm'], archetype: 'On Destroy', onBreak: 'summonShell',
     text: 'On Destroy: summon 1 "Insect Shell".' },
-  { id: 'moldy-shield', name: 'Moldy Shield', kind: 'barrier', archetype: 'On Destroy', onBreak: 'infectAttacker',
+  { id: 'moldy-shield', name: 'Moldy Shield', kind: 'barrier', roles: ['Buff/Debuff'], archetype: 'On Destroy', onBreak: 'infectAttacker',
     text: 'On Destroy: Infect the attacking monster.' },
   // ═════════════════════ Bedrock Golem deck (Stone) ═════════════════════
   // Rubble: a destroyed Stone monster with a "Rubble:" line goes to a free Barrier Zone
@@ -187,7 +189,7 @@ MC.CARDS = [
 
   // Boss
   {
-    id: 'bedrock-titan', name: 'Bedrock Titan', kind: 'boss',
+    id: 'bedrock-titan', name: 'Bedrock Titan', kind: 'boss', roles: ['Swarm', 'Buff/Debuff', 'Fortitude'],
     atk: 3500, def: 3500, footprint: 3, tags: ['Stone', 'Golem'],
     text:
       'Boss Zone: once per turn, Excavate 1 Rubble card.\n' +
@@ -201,87 +203,87 @@ MC.CARDS = [
   { id: 'pebble-sprite', name: 'Pebble Sprite', kind: 'basic',
     atk: 300, def: 300, charge: 3, tags: ['Stone'], flags: { rubble: true }, chargeBonus: { rubble: 2 },
     text: 'Rubble: +2 Charge when tributed from the Barrier Zone.' },
-  { id: 'cobble-guard', name: 'Cobble Guard', kind: 'basic',
+  { id: 'cobble-guard', name: 'Cobble Guard', kind: 'basic', roles: ['Fortitude'],
     atk: 1000, def: 1600, charge: 1, tags: ['Stone', 'Golem'], keywords: ['Blocker'], flags: { blocker: true, rubble: true },
     text: 'Blocker.\nRubble: when an opponent\'s monster attacks your monster, you can redirect the attack to this Rubble.' },
-  { id: 'quarry-worker', name: 'Quarry Worker', kind: 'basic',
+  { id: 'quarry-worker', name: 'Quarry Worker', kind: 'basic', roles: ['Consistency', 'Draw'],
     atk: 1200, def: 1000, charge: 2, tags: ['Stone'], flags: { rubble: true },
     text: 'On Summon: look at the top 3 cards of your Deck, add 1 Stone card among them to your hand and put the rest on the bottom.\nRubble: once per turn, shuffle 1 card from your hand into your Deck to draw 1.' },
-  { id: 'granite-brute', name: 'Granite Brute', kind: 'basic',
+  { id: 'granite-brute', name: 'Granite Brute', kind: 'basic', roles: ['Buff/Debuff'],
     atk: 1500, def: 1500, charge: 0, tags: ['Stone', 'Golem'], flags: { rubble: true },
     text: 'Rubble: your Stone monsters gain 200 DEF.' },
-  { id: 'geode-crawler', name: 'Geode Crawler', kind: 'basic',
+  { id: 'geode-crawler', name: 'Geode Crawler', kind: 'basic', roles: ['Draw'],
     atk: 800, def: 800, charge: 2, tags: ['Stone'], flags: { rubble: true },
     text: 'Rubble: when this Rubble is destroyed by an attack, draw 2.' },
-  { id: 'shale-slinger', name: 'Shale Slinger', kind: 'basic',
+  { id: 'shale-slinger', name: 'Shale Slinger', kind: 'basic', roles: ['Destruction', 'Buff/Debuff'],
     atk: 1300, def: 700, charge: 1, tags: ['Stone'], flags: { rubble: true },
     text: 'Once per turn: send 1 of your Rubble cards to the GY to destroy 1 face-up Action card.\nRubble: monsters that attack this Rubble lose 300 ATK until end of turn.' },
 
   // Tributes
-  { id: 'basalt-sentinel', name: 'Basalt Sentinel', kind: 'tribute',
+  { id: 'basalt-sentinel', name: 'Basalt Sentinel', kind: 'tribute', roles: ['Fortitude'],
     atk: 1800, def: 2400, charge: 2, cost: 6, footprint: 1, tags: ['Stone', 'Golem'], keywords: ['Blocker'], flags: { blocker: true, rubble: true },
     text: 'Blocker.\nRubble: once per turn, your other Rubble cards can\'t be destroyed by an attack.' },
-  { id: 'obsidian-edge', name: 'Obsidian Edge', kind: 'tribute',
+  { id: 'obsidian-edge', name: 'Obsidian Edge', kind: 'tribute', roles: ['Swarm', 'Buff/Debuff'],
     atk: 2800, def: 1200, charge: 1, cost: 7, footprint: 1, tags: ['Stone'], flags: { rubble: true },
     text: 'Once per turn: when this card destroys a monster, Excavate 1 Rubble card.\nRubble: once per turn, 1 Stone monster you control gains 500 ATK until end of turn.' },
-  { id: 'monolith-warden', name: 'Monolith Warden', kind: 'tribute',
+  { id: 'monolith-warden', name: 'Monolith Warden', kind: 'tribute', roles: ['Swarm', 'Fortitude'],
     atk: 2600, def: 3000, charge: 3, cost: 10, footprint: 2, tags: ['Stone', 'Golem'], flags: { rubble: true },
     text: 'On Summon: Excavate up to 2 Basic Stone monsters.\nRubble: an attack only destroys this Rubble if the attacker has 2000 or more ATK.' },
-  { id: 'crag-behemoth', name: 'Crag Behemoth', kind: 'tribute',
+  { id: 'crag-behemoth', name: 'Crag Behemoth', kind: 'tribute', roles: ['Destruction', 'Buff/Debuff'],
     atk: 3200, def: 2800, charge: 4, cost: 14, footprint: 2, tags: ['Stone', 'Golem'], flags: { rubble: true },
     text: 'Gains 300 ATK for each Rubble card you control.\nOnce per turn: tribute 1 of your Rubble cards to destroy 1 card on the field.\nRubble: your Excavated monsters gain 500 ATK.' },
 
   // Actions
-  { id: 'excavation', name: 'Excavation', kind: 'action',
+  { id: 'excavation', name: 'Excavation', kind: 'action', roles: ['Swarm'],
     charge: 2, cost: 1, setCost: 1, tags: ['Stone'],
     text: 'Excavate 1 Rubble card.' },
-  { id: 'landslide', name: 'Landslide', kind: 'action',
+  { id: 'landslide', name: 'Landslide', kind: 'action', roles: ['Destruction'],
     charge: 2, cost: 4, setCost: 2, tags: ['Stone'],
     text: 'Send any number of your Rubble cards to the GY: destroy that many of your opponent\'s monsters with 1500 or less DEF.' },
-  { id: 'reinforce', name: 'Reinforce', kind: 'action',
+  { id: 'reinforce', name: 'Reinforce', kind: 'action', roles: ['Fortitude'],
     charge: 2, cost: 0, setCost: 2, tags: ['Stone'],
     text: 'Move 1 Stone monster you control to a free Barrier Zone as Rubble.' },
-  { id: 'petrify', name: 'Petrify', kind: 'action',
+  { id: 'petrify', name: 'Petrify', kind: 'action', roles: ['Buff/Debuff'],
     charge: 2, cost: 3, setCost: 2, tags: ['Stone'],
     text: 'Target 1 of your opponent\'s monsters: it gains the Stone tag and can\'t attack until the end of their next turn. If it is destroyed while Stone, place it in your Barrier Zone as Rubble.' },
-  { id: 'rockfall', name: 'Rockfall', kind: 'action',
+  { id: 'rockfall', name: 'Rockfall', kind: 'action', roles: ['Destruction'],
     charge: 1, cost: 2, setCost: 0, tags: ['Stone'],
     text: 'When an opponent\'s monster attacks one of your Rubble cards: destroy the attacking monster.' },
-  { id: 'masons-blueprint', name: 'Mason\'s Blueprint', kind: 'action',
+  { id: 'masons-blueprint', name: 'Mason\'s Blueprint', kind: 'action', roles: ['Consistency'],
     charge: 3, cost: 0, setCost: null, tags: ['Stone'],
     text: 'Add 1 Stone Tribute monster from your Deck to your hand. You can\'t Excavate this turn.' },
 
   // Extra Deck
-  { id: 'rubble-hound', name: 'Rubble Hound', kind: 'extra', method: 'formation',
+  { id: 'rubble-hound', name: 'Rubble Hound', kind: 'extra', roles: ['Swarm'], method: 'formation',
     atk: 1400, def: 1000, footprint: 1, tags: ['Stone'],
     text: 'Summon: send 2 Basic Stone monsters from your hand or field to the GY.\nOn Summon: Excavate 1 Rubble card.' },
-  { id: 'gravel-swarm', name: 'Gravel Swarm', kind: 'extra', method: 'charge',
+  { id: 'gravel-swarm', name: 'Gravel Swarm', kind: 'extra', roles: ['Fortitude'], method: 'charge',
     atk: 1000, def: 1000, footprint: 2, tags: ['Stone'],
     text: 'Summon: pay a Charge Cost of 6 using only Rubble cards.\nCan\'t be destroyed in battle while you control 2 or more Rubble cards.' },
-  { id: 'keystone-golem', name: 'Keystone Golem', kind: 'extra', method: 'special',
+  { id: 'keystone-golem', name: 'Keystone Golem', kind: 'extra', roles: ['Fortitude'], method: 'special',
     atk: 3000, def: 3000, footprint: 2, tags: ['Stone', 'Golem'],
     text: 'Summon: when all 4 of your Barrier Zones hold Rubble, send all of them to the GY.\nYour opponent can\'t attack your other monsters.' },
-  { id: 'fossil-wyrm', name: 'Fossil Wyrm', kind: 'extra', method: 'special',
+  { id: 'fossil-wyrm', name: 'Fossil Wyrm', kind: 'extra', roles: ['Consistency'], method: 'special',
     atk: 2400, def: 2000, footprint: 1, tags: ['Stone'],
     text: 'Summon: shuffle 3 Stone monsters with different names from your GY into your Deck.\nOnce per turn: banish 1 card in your GY to place 1 Stone monster from your GY in a free Barrier Zone as Rubble.' },
-  { id: 'gargoyle-sentry', name: 'Gargoyle Sentry', kind: 'extra', method: 'special',
+  { id: 'gargoyle-sentry', name: 'Gargoyle Sentry', kind: 'extra', roles: ['Fortitude', 'Swarm'], method: 'special',
     atk: 1800, def: 1800, footprint: 1, tags: ['Stone', 'Golem'], keywords: ['Blocker'], flags: { blocker: true },
     text: 'Summon: when one of your Stone monsters becomes Rubble, send that Rubble to the GY (this works on either player\'s turn).\nBlocker.' },
 
   // Field
-  { id: 'quarry', name: 'Quarry', kind: 'field',
+  { id: 'quarry', name: 'Quarry', kind: 'field', roles: ['Draw'],
     text: 'Once per turn: when one of your Stone monsters becomes Rubble, draw 1.' },
-  { id: 'fault-line', name: 'Fault Line', kind: 'field',
+  { id: 'fault-line', name: 'Fault Line', kind: 'field', roles: ['Buff/Debuff'],
     text: 'Your Rubble cards gain +1 Charge.' },
-  { id: 'mountain-pass', name: 'Mountain Pass', kind: 'field',
+  { id: 'mountain-pass', name: 'Mountain Pass', kind: 'field', roles: ['Fortitude'],
     text: 'If able, your opponent\'s monsters must attack a Rubble card.' },
-  { id: 'ancient-ruins', name: 'Ancient Ruins', kind: 'field',
+  { id: 'ancient-ruins', name: 'Ancient Ruins', kind: 'field', roles: ['Consistency'],
     text: 'Once per turn: swap 1 of your Rubble cards with a Stone monster in your hand.' },
 
   // Barriers
-  { id: 'cairn', name: 'Cairn', kind: 'barrier', archetype: 'On Destroy',
+  { id: 'cairn', name: 'Cairn', kind: 'barrier', roles: ['Swarm'], archetype: 'On Destroy',
     text: 'On Destroy: Excavate 1 Rubble card.' },
-  { id: 'bedrock-bulwark', name: 'Bedrock Bulwark', kind: 'barrier', archetype: 'Tag Bonus', tags: ['Stone'],
+  { id: 'bedrock-bulwark', name: 'Bedrock Bulwark', kind: 'barrier', roles: ['Buff/Debuff'], archetype: 'Tag Bonus', tags: ['Stone'],
     text: 'While face-up: your Stone monsters gain 300 DEF.' },
 ];
 

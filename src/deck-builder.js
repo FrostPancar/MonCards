@@ -1,6 +1,6 @@
 /*
  * Deck Builder: a mini panel to pick cards (left) with live deck stats (right):
- * a Charge curve, a Basic / Tribute / Action triangle, a flavor chart (power, swarm, destruction…) and a tag counter, each compared
+ * a Charge curve, a Basic / Tribute / Action triangle, a flavor chart (power, swarm, destruction, buffs, fortitude, monotype, consistency, draw) and a tag counter, each compared
  * with the average of every other deck. Saved decks are kept in this browser and
  * show up in the deck lists (Card Index, Play Table).
  */
@@ -31,41 +31,41 @@
   const chargeMax = Math.max(5, ...MC.CARDS.filter(c => MAIN_KINDS.includes(c.kind)).map(c => c.charge || 0));
 
   // ───────────────────────── Deck flavor ─────────────────────────
-  // Six traits scored 0–1 from the Main Deck, so decks can be compared by playstyle.
+  // Eight traits scored 0–1 from every card in the deck (Main, Extra, Field, Barriers, Boss).
   const clamp = v => Math.max(0, Math.min(1, v));
-  const FLAVOR = ['Power', 'Swarm', 'Destruction', 'Tricks', 'Fortitude', 'Synergy'];
+  const FLAVOR = ['Power', 'Swarm', 'Destruction', 'Buff/Debuff', 'Fortitude', 'Monotype', 'Consistency', 'Draw'];
+  /** Share of the deck's cards carrying a role that scores a full 100. */
+  const ROLE_FULL = { 'Swarm': 0.35, 'Destruction': 0.25, 'Buff/Debuff': 0.3, 'Fortitude': 0.3, 'Consistency': 0.25, 'Draw': 0.2 };
   /**
-   *   Power        average ATK of the monsters
-   *   Swarm        share of Basic monsters, plus Actions that summon
-   *   Destruction  share of cards that destroy, banish, damage, infect or reduce
-   *   Tricks       share of Actions, plus cards that act on the opponent
-   *   Fortitude    average DEF of the monsters, plus Blockers
-   *   Synergy      how much of the deck shares its most common tag
+   *   Power        average of the monsters' ATK and DEF
+   *   Monotype     how much of the deck shares its most common Tag
+   *   the rest     the share of cards with that role (the `roles` field, any card type)
    */
   function flavorOf(list) {
-    let n = 0, mon = 0, atk = 0, def = 0, basic = 0, summon = 0, destroy = 0, trick = 0, block = 0;
-    const tags = {};
+    let n = 0, mon = 0, atk = 0, def = 0, tagged = 0;
+    const roles = {}, tags = {};
     for (const [id, k] of list) {
-      const c = MC.byId[id], text = (c.text || '') + ' ' + (c.keywords || []).join(' ');
+      const c = MC.byId[id];
       n += k;
-      if (c.kind !== 'action') { mon += k; atk += c.atk * k; def += c.def * k; }
-      if (c.kind === 'basic') basic += k;
-      if (c.kind === 'action') { trick += k; if (/\bsummon/i.test(text)) summon += k; }
-      else if (/opponent/i.test(text)) trick += k;
-      if (/destroy|banish|damage|lose |infect|reduce/i.test(text)) destroy += k;
-      if (c.flags?.blocker || /blocker/i.test(text)) block += k;
+      if (MC.isMonster(c)) { mon += k; atk += c.atk * k; def += c.def * k; }
+      (c.roles || []).forEach(r => { roles[r] = (roles[r] || 0) + k; });
+      if (c.tags?.length) tagged += k;
       (c.tags || []).forEach(t => { tags[t] = (tags[t] || 0) + k; });
     }
     if (!n) return FLAVOR.map(() => 0);
     const top = Math.max(0, ...Object.values(tags));
+    const role = r => clamp((roles[r] || 0) / n / ROLE_FULL[r]);
     return [
-      clamp(mon ? atk / mon / 2200 : 0),
-      clamp((basic + summon) / n / 0.6),
-      clamp(destroy / n / 0.5),
-      clamp(trick / n / 0.8),
-      clamp(0.7 * (mon ? def / mon / 2000 : 0) + 0.3 * clamp(block / (0.1 * n))),
-      clamp((top / n - 0.3) / 0.6),
+      mon ? clamp((atk / mon / 2200 + def / mon / 2000) / 2) : 0,
+      role('Swarm'), role('Destruction'), role('Buff/Debuff'), role('Fortitude'),
+      clamp((top / (tagged || 1) - 0.3) / 0.6),
+      role('Consistency'), role('Draw'),
     ];
+  }
+  /** Every card in a deck as [id, copies]: Main, Extra, Field, Barriers and Boss. */
+  function allCards(d) {
+    const one = id => [id, 1];
+    return [...d.main, ...d.extra, ...d.field.map(one), ...d.barriers.map(one), ...(d.boss ? [one(d.boss)] : [])].filter(([id]) => known(id));
   }
 
   /** Everything the right panel shows, for a list of [id, copies]. */
@@ -85,7 +85,7 @@
   /** Average of every other deck, scaled to `n` cards so a half-built deck compares fairly. */
   function averageOf(exceptKey, n) {
     const all = Object.entries(MC.DECKS).filter(([k, d]) => k !== exceptKey && d.main?.length)
-      .map(([, d]) => ({ ...statsOf(mainCards(d)), flavor: flavorOf(mainCards(d)) })).filter(s => s.n);
+      .map(([, d]) => ({ ...statsOf(mainCards(d)), flavor: flavorOf(allCards(d)) })).filter(s => s.n);
     if (!all.length) return null;
     const avg = { n: 0, charge: {}, tags: {}, flavor: FLAVOR.map(() => 0), decks: all.length };
     avg.n = all.reduce((a, s) => a + s.n, 0) / all.length;
@@ -112,7 +112,7 @@
 
   // ───────────────────────── Builder state ─────────────────────────
   let st, box;
-  const fresh = () => ({ picks: {}, key: null, avgKey: null, name: 'My Deck', tab: 'index', q: '', kind: 'all', tag: 'all', sort: 'type', dir: 1, openSort: false });
+  const fresh = () => ({ picks: {}, key: null, avgKey: null, name: 'My Deck', tab: 'index', q: '', kind: 'all', tag: 'all', role: 'all', sort: 'type', dir: 1, openSort: false });
 
   const limitOf = c => c.kind === 'boss' ? 1 : c.kind === 'field' ? 1 : c.kind === 'barrier' ? 4 : c.kind === 'extra' ? (c.limit ?? 2) : (c.limit ?? 4);
   const poolOf = c => MAIN_KINDS.includes(c.kind) ? 'main' : c.kind;
@@ -220,6 +220,7 @@
     const q = st.q.trim().toLowerCase();
     const list = MC.CARDS.filter(c => (st.kind === 'all' || c.kind === st.kind)
       && (st.tag === 'all' || (c.tags || []).includes(st.tag))
+      && (st.role === 'all' || (c.roles || []).includes(st.role))
       && (!q || [c.name, c.text, c.archetype, ...(c.tags || [])].join(' ').toLowerCase().includes(q)));
     const cmp = st.sort === 'picked'
       ? (a, b) => (st.picks[b.id] || 0) - (st.picks[a.id] || 0) || byType(a, b)
@@ -252,7 +253,7 @@
     const cards = pickList();
     return tabs + `
       <input class="search db-search" type="search" placeholder="Search name, text, tag…" value="${MC.esc(st.q)}" aria-label="Search cards">
-      <details class="db-sort" ${st.openSort ? 'open' : ''}><summary>Sort &amp; filter <small>${SORTS[st.sort][0]} ${st.dir > 0 ? '↑' : '↓'}${st.kind !== 'all' ? ' · ' + MC.KINDS[st.kind].label : ''}${st.tag !== 'all' ? ' · ' + MC.esc(st.tag) : ''}</small></summary>
+      <details class="db-sort" ${st.openSort ? 'open' : ''}><summary>Sort &amp; filter <small>${SORTS[st.sort][0]} ${st.dir > 0 ? '↑' : '↓'}${st.kind !== 'all' ? ' · ' + MC.KINDS[st.kind].label : ''}${st.tag !== 'all' ? ' · ' + MC.esc(st.tag) : ''}${st.role !== 'all' ? ' · ' + st.role : ''}</small></summary>
         <div class="db-sort-body">
           <div class="chips">${['all', ...MC.KIND_ORDER].map(k => k === 'all'
             ? `<button class="chip ${st.kind === 'all' ? 'on' : ''}" data-kind="all">All</button>`
@@ -260,6 +261,7 @@
           <div class="selects">
             <label>Sort <select data-sel="sort">${Object.entries(SORTS).map(([k, [l]]) => `<option value="${k}" ${st.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
             <button class="chip" data-dir>${st.dir > 0 ? 'Low → High' : 'High → Low'}</button>
+            <label>Role <select data-sel="role"><option value="all">Any</option>${Object.keys(MC.ROLES).map(r => `<option ${st.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
             <label>Tag <select data-sel="tag"><option value="all">Any</option>${tags.map(t => `<option ${st.tag === t ? 'selected' : ''}>${MC.esc(t)}</option>`).join('')}</select></label>
           </div></div></details>
       <div class="db-scroll"><div class="db-grid">${cards.map(cellHTML).join('') || '<p class="db-empty">No cards match.</p>'}</div></div>`;
@@ -280,7 +282,7 @@
         ${chargeChart(s, avg)}
 </section>
       <section class="db-sec"><h3>Deck mix · Flavor</h3>
-        <div class="db-tris">${mixTriangle(s)}${flavorChart(mainCards(deck), avg)}</div></section>
+        <div class="db-tris">${mixTriangle(s)}${flavorChart(allCards(deck), avg)}</div></section>
       <section class="db-sec"><h3>Tags</h3>${tagBars(s, avg)}</section>`;
   }
 

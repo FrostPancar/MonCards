@@ -81,6 +81,18 @@
   MC.TAG_COLORS = { Insect: '#3aa63a', Ant: '#e2582a', Fungus: '#d03aa8', Undead: '#7a6c94', Infected: '#d03aa8', Stone: '#8a7a66', Golem: '#5f6f86',
     Fire: '#e8482a', Water: '#2a82e0', Arcane: '#9a4ae0', Light: '#e2b81e', Animal: '#b07a3a', Ice: '#4ac0e4', Steel: '#7a8aa0', Nature: '#46b034',
     Parasite: '#9aa82a', Curse: '#6a2a8a', Eternal: '#b8903a', Sanguine: '#b01e3a' };
+  /**
+   * Roles: playstyle tags any card can carry (the `roles` field), used by the Deck Builder's flavor chart.
+   * Power and Monotype aren't tags: they're worked out from stats and Tags.
+   */
+  MC.ROLES = {
+    'Swarm':       'Summons itself, or summons / Excavates other monsters',
+    'Destruction': 'Removal: destroys or banishes cards',
+    'Buff/Debuff': 'Raises or lowers monster stats, or inflicts statuses (Infect, negate, can\'t attack)',
+    'Fortitude':   'Protects: Blockers, redirects, "can\'t be destroyed" effects',
+    'Consistency': 'Searches or recovers specific cards',
+    'Draw':        'Draws cards, strictly',
+  };
   /** Renamed tags: old name → new name (applied to every card, including shared ones). */
   MC.TAG_ALIASES = { Grass: 'Nature' };
   /** Tag chip: icon only, the name slides out on hover. */

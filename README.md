@@ -17,7 +17,7 @@ Two views:
   detail view) or duplicated; new cards and edits are shared with everyone (edits can be reset), and
   **Copy code** gives a snippet to paste into `data/cards.js`. The **Art icons** (also on the mini cards of the Play Table and Deck Builder) and **Full text** options
   hide the art icon or drop the art area to give effect text more room. A **Light/Dark** toggle switches the index theme.
-  The **⚒ Deck Builder** button opens a panel for building a deck: a small card index on the left (collapsible
+  Cards also carry **Roles** (Swarm, Destruction, Buff/Debuff, Fortitude, Consistency, Draw) set in the Card Creator and used by the Deck Builder flavor chart. The **⚒ Deck Builder** button opens a panel for building a deck: a small card index on the left (collapsible
   sort & filter menu, click to add, − or right-click to remove) and live stats on the right: a Charge curve, a stat
   triangle per card type (Basic, Tribute, Action) and a tag counter, each compared with the average of the other decks.
   Decks are saved in this browser (**Save deck**) and appear in the deck lists once legal.
