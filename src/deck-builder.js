@@ -1,6 +1,6 @@
 /*
  * Deck Builder: a mini panel to pick cards (left) with live deck stats (right):
- * a Charge curve, a stat triangle per card type and a tag counter, each compared
+ * a Charge curve, a Basic / Tribute / Action triangle, a flavor chart (power, swarm, destruction…) and a tag counter, each compared
  * with the average of every other deck. Saved decks are kept in this browser and
  * show up in the deck lists (Card Index, Play Table).
  */
@@ -30,38 +30,53 @@
   const mainCards = deck => deck.main.filter(([id]) => known(id) && MAIN_KINDS.includes(MC.byId[id].kind));
   const chargeMax = Math.max(5, ...MC.CARDS.filter(c => MAIN_KINDS.includes(c.kind)).map(c => c.charge || 0));
 
-  // The three stats shown on each type's triangle.
-  const AXES = {
-    basic:   [['ATK', c => c.atk], ['DEF', c => c.def], ['CHG', c => c.charge]],
-    tribute: [['ATK', c => c.atk], ['DEF', c => c.def], ['COST', c => c.cost]],
-    action:  [['CHG', c => c.charge], ['COST', c => c.cost], ['SET', c => c.setCost]],
-  };
-  const GRADES = ['E', 'D', 'C', 'B', 'A'];
-  /** Highest value of each axis over every card of that type: the "A" ceiling. */
-  const ceiling = {};
-  for (const k of MAIN_KINDS) {
-    ceiling[k] = AXES[k].map(([, f]) => Math.max(1, ...MC.CARDS.filter(c => c.kind === k).map(c => f(c) || 0)));
+  // ───────────────────────── Deck flavor ─────────────────────────
+  // Six traits scored 0–1 from the Main Deck, so decks can be compared by playstyle.
+  const clamp = v => Math.max(0, Math.min(1, v));
+  const FLAVOR = ['Power', 'Swarm', 'Destruction', 'Tricks', 'Fortitude', 'Synergy'];
+  /**
+   *   Power        average ATK of the monsters
+   *   Swarm        share of Basic monsters, plus Actions that summon
+   *   Destruction  share of cards that destroy, banish, damage, infect or reduce
+   *   Tricks       share of Actions, plus cards that act on the opponent
+   *   Fortitude    average DEF of the monsters, plus Blockers
+   *   Synergy      how much of the deck shares its most common tag
+   */
+  function flavorOf(list) {
+    let n = 0, mon = 0, atk = 0, def = 0, basic = 0, summon = 0, destroy = 0, trick = 0, block = 0;
+    const tags = {};
+    for (const [id, k] of list) {
+      const c = MC.byId[id], text = (c.text || '') + ' ' + (c.keywords || []).join(' ');
+      n += k;
+      if (c.kind !== 'action') { mon += k; atk += c.atk * k; def += c.def * k; }
+      if (c.kind === 'basic') basic += k;
+      if (c.kind === 'action') { trick += k; if (/\bsummon/i.test(text)) summon += k; }
+      else if (/opponent/i.test(text)) trick += k;
+      if (/destroy|banish|damage|lose |infect|reduce/i.test(text)) destroy += k;
+      if (c.flags?.blocker || /blocker/i.test(text)) block += k;
+      (c.tags || []).forEach(t => { tags[t] = (tags[t] || 0) + k; });
+    }
+    if (!n) return FLAVOR.map(() => 0);
+    const top = Math.max(0, ...Object.values(tags));
+    return [
+      clamp(mon ? atk / mon / 2200 : 0),
+      clamp((basic + summon) / n / 0.6),
+      clamp(destroy / n / 0.5),
+      clamp(trick / n / 0.8),
+      clamp(0.7 * (mon ? def / mon / 2000 : 0) + 0.3 * clamp(block / (0.1 * n))),
+      clamp((top / n - 0.3) / 0.6),
+    ];
   }
-  const grade = r => GRADES[Math.min(4, Math.max(0, Math.ceil(r * 5 - 1e-9) - 1))];
 
   /** Everything the right panel shows, for a list of [id, copies]. */
   function statsOf(list) {
-    const s = { n: 0, kinds: { basic: 0, tribute: 0, action: 0 }, charge: {}, tags: {}, axes: {} };
+    const s = { n: 0, kinds: { basic: 0, tribute: 0, action: 0 }, charge: {}, tags: {} };
     for (let i = 0; i <= chargeMax; i++) s.charge[i] = { basic: 0, tribute: 0, action: 0 };
-    const sums = {}, counts = {};
     for (const [id, n] of list) {
       const c = MC.byId[id];
       s.n += n; s.kinds[c.kind] += n;
       s.charge[Math.min(chargeMax, c.charge || 0)][c.kind] += n;
       (c.tags || []).forEach(t => { s.tags[t] = (s.tags[t] || 0) + n; });
-      AXES[c.kind].forEach(([, f], i) => {
-        const v = f(c);
-        if (v == null) return;
-        (sums[c.kind] ||= [0, 0, 0])[i] += v * n; (counts[c.kind] ||= [0, 0, 0])[i] += n;
-      });
-    }
-    for (const k of MAIN_KINDS) {
-      s.axes[k] = AXES[k].map((_, i) => (counts[k]?.[i] ? sums[k][i] / counts[k][i] : 0));
     }
     return s;
   }
@@ -70,18 +85,15 @@
   /** Average of every other deck, scaled to `n` cards so a half-built deck compares fairly. */
   function averageOf(exceptKey, n) {
     const all = Object.entries(MC.DECKS).filter(([k, d]) => k !== exceptKey && d.main?.length)
-      .map(([, d]) => statsOf(mainCards(d))).filter(s => s.n);
+      .map(([, d]) => ({ ...statsOf(mainCards(d)), flavor: flavorOf(mainCards(d)) })).filter(s => s.n);
     if (!all.length) return null;
-    const avg = { n: 0, charge: {}, tags: {}, axes: {}, decks: all.length };
+    const avg = { n: 0, charge: {}, tags: {}, flavor: FLAVOR.map(() => 0), decks: all.length };
     avg.n = all.reduce((a, s) => a + s.n, 0) / all.length;
     const f = n ? n / avg.n : 1;
     for (let i = 0; i <= chargeMax; i++) avg.charge[i] = all.reduce((a, s) => a + total(s.charge[i]), 0) / all.length * f;
     for (const s of all) for (const t of Object.keys(s.tags)) avg.tags[t] = 0;
     for (const t of Object.keys(avg.tags)) avg.tags[t] = all.reduce((a, s) => a + (s.tags[t] || 0), 0) / all.length * f;
-    for (const k of MAIN_KINDS) {
-      const have = all.filter(s => s.kinds[k]);
-      avg.axes[k] = have.length ? AXES[k].map((_, i) => have.reduce((a, s) => a + s.axes[k][i], 0) / have.length) : [0, 0, 0];
-    }
+    avg.flavor = FLAVOR.map((_, i) => all.reduce((a, d) => a + d.flavor[i], 0) / all.length);
     return avg;
   }
 
@@ -152,36 +164,42 @@
     }).join('')}</div>`;
   }
 
-  /** Stat triangle for one card type: three axes graded E–A, your deck over the average of all decks. */
-  function triangle(kind, s, avg) {
-    const cx = 115, cy = 124, r = 70, k = MC.KINDS[kind];
-    const ang = [-90, 30, 150].map(a => a * Math.PI / 180);
-    const pt = (i, ratio) => [cx + Math.cos(ang[i]) * r * ratio, cy + Math.sin(ang[i]) * r * ratio];
-    const poly = ratios => ratios.map((q, i) => pt(i, Math.max(0.04, Math.min(1, q))).map(v => v.toFixed(1)).join(',')).join(' ');
-    const ratios = a => a.map((v, i) => v / ceiling[kind][i]);
-    const mine = ratios(s.axes[kind]), theirs = avg ? ratios(avg.axes[kind]) : null;
-    const has = s.kinds[kind] > 0;
+  /**
+   * Radar chart. `axes` = [[label, value 0–1, caption?]], `ghost` = optional second outline (the average).
+   * Rings are unlabelled: the shape is the point.
+   */
+  function radar(axes, ghost, color, rings = 4, W = 240) {
+    const N = axes.length, cx = W / 2, cy = 108, r = 66;
+    const ang = axes.map((_, i) => (-90 + i * 360 / N) * Math.PI / 180);
+    const pt = (i, q, k = r) => [cx + Math.cos(ang[i]) * k * q, cy + Math.sin(ang[i]) * k * q];
+    const poly = vals => vals.map((q, i) => pt(i, Math.max(0.05, clamp(q))).map(v => v.toFixed(1)).join(',')).join(' ');
     let g = '';
-    for (let q = 1; q <= 5; q++) g += `<polygon class="ring" points="${poly([q / 5, q / 5, q / 5])}"/>`;
-    ang.forEach((_, i) => {
-      const [x, y] = pt(i, 1);
-      g += `<line class="spoke" x1="${cx}" y1="${cy}" x2="${x}" y2="${y}"/>`;
-      for (let q = 1; q <= 5; q++) { const [px, py] = pt(i, q / 5); g += `<circle class="pip" cx="${px}" cy="${py}" r="1.6"/>`; }
+    for (let q = 1; q <= rings; q++) g += `<polygon class="ring ${q === rings ? "ring-out" : ""}" points="${poly(axes.map(() => q / rings))}"/>`;
+    ang.forEach((_, i) => { const [x, y] = pt(i, 1); g += `<line class="spoke" x1="${cx}" y1="${cy}" x2="${x}" y2="${y}"/>`; });
+    if (ghost) g += `<polygon class="tri-avg" points="${poly(ghost)}"/>`;
+    g += `<polygon class="tri-me" points="${poly(axes.map(a => a[1]))}" style="--kc:${color}"/>`;
+    axes.forEach(([name, , cap], i) => {
+      const [x, y] = pt(i, 1.22), c = Math.cos(ang[i]);
+      const anchor = Math.abs(c) < 0.2 ? 'middle' : c > 0 ? 'start' : 'end';
+      const dy = Math.sin(ang[i]) > 0.5 ? 10 : Math.sin(ang[i]) < -0.5 ? -8 : 0;
+      g += `<text class="vn" x="${x}" y="${y + dy}" text-anchor="${anchor}">${name}</text>` +
+        (cap != null ? `<text class="vv" x="${x}" y="${y + dy + 12}" text-anchor="${anchor}">${cap}</text>` : '');
     });
-    GRADES.forEach((gr, q) => { const [x, y] = pt(0, (q + 1) / 5); g += `<text class="gr" x="${x + 5}" y="${y + 3}">${gr}</text>`; });
-    if (theirs) g += `<polygon class="tri-avg" points="${poly(theirs)}"/>`;
-    if (has) g += `<polygon class="tri-me" points="${poly(mine)}" style="--kc:${k.frame}"/>`;
-    const lab = AXES[kind].map(([name], i) => {
-      const [vx, vy] = pt(i, 1);
-      const x = i === 0 ? cx : vx + (i === 1 ? 12 : -12), y0 = i === 0 ? 14 : vy + 18;
-      const val = has ? s.axes[kind][i] : null;
-      const d = has && avg ? s.axes[kind][i] - avg.axes[kind][i] : null;
-      return `<text class="vn" x="${x}" y="${y0}" text-anchor="middle">${name}</text>` +
-        `<text class="vg" x="${x}" y="${y0 + 19}" text-anchor="middle">${has ? grade(mine[i]) : '–'}</text>` +
-        (val != null ? `<text class="vv ${d == null ? '' : dClass(d)}" x="${x}" y="${y0 + 31}" text-anchor="middle">${fmt(val)}</text>` : '');
-    }).join('');
-    return `<figure class="db-tri k-${kind}"><svg viewBox="0 0 230 212" role="img" aria-label="${k.label} stats">${g}${lab}</svg>
-      <figcaption><i class="swatch"></i>${k.label} <b>${s.kinds[kind]}</b></figcaption></figure>`;
+    return `<svg viewBox="0 0 ${W} 216" role="img">${g}</svg>`;
+  }
+
+  /** How many Basic, Tribute and Action cards: one simple triangle. */
+  function mixTriangle(s) {
+    const counts = MAIN_KINDS.map(k => s.kinds[k]), top = Math.max(1, ...counts);
+    return `<figure class="db-tri">${radar(MAIN_KINDS.map((k, i) => [MC.KINDS[k].label, counts[i] / top, counts[i]]), null, '#f2c84b', 3, 280)}</figure>`;
+  }
+
+  function flavorChart(deckList, avg) {
+    const v = flavorOf(deckList), n = deckList.reduce((a, [, k]) => a + k, 0);
+    const top = FLAVOR.map((name, i) => [name, v[i]]).sort((a, b) => b[1] - a[1]);
+    const label = n ? top.slice(0, 2).filter(t => t[1] > 0.15).map(t => t[0]).join(' · ') : '';
+    return `<figure class="db-tri db-flavor">${radar(FLAVOR.map((name, i) => [name, v[i], n ? Math.round(v[i] * 100) : null]), avg?.flavor, '#8a6ae0', 4, 360)}
+      <figcaption>${label || '–'}</figcaption></figure>`;
   }
 
   function tagBars(s, avg) {
@@ -261,8 +279,8 @@
         <div class="db-legend">${MAIN_KINDS.map(k => `<span class="k-${k}"><i class="swatch"></i>${MC.KINDS[k].label}</span>`).join('')}</div>
         ${chargeChart(s, avg)}
 </section>
-      <section class="db-sec"><h3>Stat triangles</h3>
-        <div class="db-tris">${MAIN_KINDS.map(k => triangle(k, s, avg)).join('')}</div></section>
+      <section class="db-sec"><h3>Deck mix · Flavor</h3>
+        <div class="db-tris">${mixTriangle(s)}${flavorChart(mainCards(deck), avg)}</div></section>
       <section class="db-sec"><h3>Tags</h3>${tagBars(s, avg)}</section>`;
   }
 

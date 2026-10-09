@@ -501,7 +501,7 @@
     const need = (label, got, want, soft) => { if (got !== want) (soft ? warnings : errors).push(`${label}: ${got}/${want}`); };
     need('Main Deck', MC.count(deck.main), 50);
     need('Side Deck', MC.count(deck.side), 15, MC.count(deck.side) === 0);
-    need('Extra Deck', MC.count(deck.extra), 10);
+    if (MC.count(deck.extra) > 10) errors.push(`Extra Deck: ${MC.count(deck.extra)}/10`);   // an Extra Deck is optional
     need('Field Deck', deck.field.length, 4);
     need('Barriers', deck.barriers.length, 4);
 
