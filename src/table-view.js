@@ -48,7 +48,7 @@
 
   const P = i => S.players[i];
   const opp = i => 1 - i;
-  const log = msg => { S.log.unshift(msg); S.log.length = Math.min(S.log.length, 80); };
+  const log = msg => { S.log.unshift(msg); S.log.length = Math.min(S.log.length, 300); };
   const atk = inst => inst.card.atk + inst.mods.atk;
   const def = inst => inst.card.def + inst.mods.def;
   const fp = card => card.footprint || 1;
@@ -715,7 +715,8 @@
       body = S.phase === 3 ? 'Select a monster and press Attack.' : 'Drag cards from your hand onto the table, or click a card for options.';
     }
     return `<div class="box prompt ${hot ? 'box-hot' : ''}"><span class="box-tab">${MC.esc(title)}</span>
-      <p>${body}</p><div class="prompt-btns">${btns}</div></div>`;
+      <p>${body}</p><div class="prompt-btns">${btns}
+        <button class="btn btn-sm btn-hot" data-next ${S.mode || S.prompt ? 'disabled' : ''}>${S.phase === 4 ? 'End turn ▶' : 'Next phase ▶'}</button></div></div>`;
   }
 
   function controlsHTML() {
