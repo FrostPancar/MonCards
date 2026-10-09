@@ -2,9 +2,9 @@
 (function () {
   const MC = window.MC;
 
-  MC.modal = function (html, { wide = false, onClose } = {}) {
+  MC.modal = function (html, { wide = false, cls = '', onClose } = {}) {
     const el = document.getElementById('modal');
-    el.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''}">
+    el.innerHTML = `<div class="modal-box ${wide ? 'wide' : ''} ${cls}">
       <button class="btn modal-close" data-close aria-label="Close">✕</button>${html}</div>`;
     el.hidden = false;
     el._onClose = onClose;

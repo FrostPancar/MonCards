@@ -446,7 +446,7 @@
 
   // ───────────────────────── Dialogs ─────────────────────────
   function newDuelDialog() {
-    const opts = sel => Object.entries(MC.DECKS).map(([k, d]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${MC.esc(d.name)}</option>`).join('');
+    const opts = sel => Object.entries(MC.DECKS).filter(([, d]) => !d.custom || MC.deckPlayable(d)).map(([k, d]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${MC.esc(d.name)}</option>`).join('');
     const box = MC.modal(`<div class="newduel">
       <span class="eyebrow">Setup</span><h2>New Duel</h2>
       <label>Player 1 deck <select name="a">${opts('hive')}</select></label>
@@ -665,20 +665,25 @@
         <li>Hand <b>${p.hand.length}</b></li><li>Deck <b>${p.deck.length}</b></li>
         <li>GY <b>${p.gy.length}</b></li><li>Barriers <b>${up}/4</b></li>
       </ul>
+      ${S.active !== pi ? `<button class="btn btn-sm plate-peek" data-peek="${pi}">${S.peek[pi] ? 'Hide hand' : 'Peek at hand'}</button>` : ''}
       ${direct ? '<div class="direct-hint">▶ Click to attack directly</div>' : ''}
     </div>`;
   }
 
+  const handShown = pi => S.active === pi || S.peek[pi];
+  let prevVis = null;   // hand visibility at the last render, [bool, bool]
+
   function handHTML(pi) {
     const p = P(pi);
-    const shown = S.active === pi || S.peek[pi];
+    const shown = handShown(pi);
     const hints = dropHints();
     const drop = hints && hints.pi === pi && hints.hand;
     const cards = p.hand.map(inst => miniFor(pi, inst, { faceDown: !shown, where: shown ? 'hand' : 'hand-hidden', extra: 'mini-hand' })).join('');
-    return `<div class="hand hand-${pi} ${drop ? 'drop-ok' : ''}" data-handzone="${pi}">
-      <div class="hand-label">${MC.esc(p.name)} · Hand ${p.hand.length}
-        ${S.active !== pi ? `<button class="btn btn-sm" data-peek="${pi}">${S.peek[pi] ? 'Hide' : 'Peek'}</button>` : ''}</div>
-      <div class="hand-cards">${cards || '<span class="empty">Empty hand</span>'}</div></div>`;
+    // The opponent's hand folds away; render() starts from the previous state and flips it a frame later so it animates.
+    const vis = prevVis ? prevVis[pi] : handShown(pi);
+    return `<div class="hand-wrap ${vis ? '' : 'collapsed'}" data-handwrap="${pi}"><div class="hand hand-${pi} ${drop ? 'drop-ok' : ''}" data-handzone="${pi}">
+      <div class="hand-label">${MC.esc(p.name)} · Hand ${p.hand.length}</div>
+      <div class="hand-cards">${cards || '<span class="empty">Empty hand</span>'}</div></div></div>`;
   }
 
   /** Top dialog box: what the game is waiting for. */
@@ -782,9 +787,13 @@
 
   function render() {
     if (!S) return;
+    const wasLeft = root.querySelector('.hud')?.scrollTop;
     root.innerHTML = `
-      <div class="table-layout">
-        <aside class="hud">
+      <div class="table-layout ${panelClasses()}">
+        <div class="edge-zone edge-left" data-edge="left"></div><div class="edge-zone edge-right" data-edge="right"></div>
+        <button class="panel-toggle pt-left" data-ptoggle="left" aria-label="Toggle left panel" title="Show / hide the left panel"><span>‹</span></button>
+        <button class="panel-toggle pt-right" data-ptoggle="right" aria-label="Toggle right panel" title="Show / hide the right panel"><span>›</span></button>
+        <aside class="hud panel panel-left">
           ${plateHTML(1)}
           <div class="box turn"><span class="box-tab">Turn ${S.turn}</span>
             <ol class="phases">${PHASES.map((ph, i) => `<li class="${i === S.phase ? 'on' : i < S.phase ? 'done' : ''}">${ph}</li>`).join('')}</ol>
@@ -814,9 +823,63 @@
           </div></div></div>
           ${handHTML(0)}
         </div>
-        <aside class="dialog-slot">${dialogHTML()}</aside>
+        <aside class="dialog-slot panel panel-right">${dialogHTML()}</aside>
       </div>`;
+    if (wasLeft) root.querySelector('.hud').scrollTop = wasLeft;
+    // Flip any hand that changed visibility since last render, so it animates instead of jumping.
+    const now = [handShown(0), handShown(1)];
+    if (prevVis && (prevVis[0] !== now[0] || prevVis[1] !== now[1])) {
+      void root.offsetHeight;
+      root.querySelectorAll('[data-handwrap]').forEach(w => w.classList.toggle('collapsed', !now[+w.dataset.handwrap]));
+    }
+    prevVis = now;
+    const stage = root.querySelector('.stage');
+    stageRO.disconnect(); stageRO.observe(stage);
     fit();
+  }
+
+  // ───────────────────────── Side panels ─────────────────────────
+  // Desktop only: either side panel can be tucked away to give the board the room.
+  // A hidden panel slides back in as an overlay while the pointer is at that screen edge.
+  const ui = { left: true, right: true, peekLeft: false, peekRight: false };
+  try { const v = JSON.parse(localStorage.getItem('mc-panels') || 'null'); if (v) { ui.left = v.left !== false; ui.right = v.right !== false; } } catch (e) { /* storage blocked */ }
+  const cap = k => k[0].toUpperCase() + k.slice(1);
+  const panelClasses = () => ['left', 'right'].map(k => `${ui[k] ? 'docked' : 'tucked'}-${k} ${ui['peek' + cap(k)] ? 'peek-' + k : ''}`).join(' ');
+  const stageRO = new ResizeObserver(() => fit());
+  const peekTimers = {};
+
+  function applyPanels() {
+    const lay = root.querySelector('.table-layout');
+    if (lay) lay.className = 'table-layout ' + panelClasses();
+    document.body.classList.toggle('tbl-left-off', !ui.left);
+    document.body.classList.toggle('tbl-right-off', !ui.right);
+    try { localStorage.setItem('mc-panels', JSON.stringify({ left: ui.left, right: ui.right })); } catch (e) { /* storage blocked */ }
+  }
+  function setPeek(side, on) {
+    clearTimeout(peekTimers[side]);
+    if (ui['peek' + cap(side)] === on) return;
+    ui['peek' + cap(side)] = on;
+    applyPanels();
+  }
+  function wirePanels() {
+    root.addEventListener('mouseover', e => {
+      const z = e.target.closest('.edge-zone');
+      if (z && !ui[z.dataset.edge]) setPeek(z.dataset.edge, true);
+      for (const side of ['left', 'right']) {
+        if (e.target.closest('.panel-' + side)) clearTimeout(peekTimers[side]);
+      }
+    });
+    root.addEventListener('mouseout', e => {
+      for (const side of ['left', 'right']) {
+        const p = e.target.closest('.panel-' + side);
+        if (!p || p.contains(e.relatedTarget) || !ui['peek' + cap(side)]) continue;
+        clearTimeout(peekTimers[side]);
+        peekTimers[side] = setTimeout(() => {
+          if (p.contains(document.activeElement) && document.activeElement.matches('input')) return; // typing an LP value
+          setPeek(side, false);
+        }, 280);
+      }
+    });
   }
 
   /**
@@ -835,7 +898,7 @@
     const r1 = t.getBoundingClientRect();
     const sw = stage.clientWidth / (r1.width + 24);
     const sh = fixed ? stage.clientHeight / (r1.height + edge) : Infinity;
-    const s = Math.max(0.3, Math.min(1.4, sw, sh));
+    const s = Math.max(0.3, Math.min(1.9, sw, sh));
     f.style.transform = `translateX(-50%) scale(${s})`;
     let sr = stage.getBoundingClientRect(), tr = t.getBoundingClientRect();
     if (!fixed) { stage.style.height = (tr.height + edge * s + 8) + 'px'; sr = stage.getBoundingClientRect(); }
@@ -1003,6 +1066,11 @@
     if ((el = btn('[data-cancel]'))) { S.mode = null; render(); return; }
     if ((el = btn('[data-pay-ok]'))) { confirmPay(); render(); return; }
     if ((el = btn('[data-prompt]'))) { const p = S.prompt; S.prompt = null; p.buttons[+el.dataset.prompt].run(); render(); return; }
+    if ((el = btn('[data-ptoggle]'))) {
+      const side = el.dataset.ptoggle;
+      ui[side] = !ui[side]; ui['peek' + cap(side)] = false;
+      applyPanels(); return;
+    }
     if ((el = btn('[data-peek]'))) { S.peek[+el.dataset.peek] = !S.peek[+el.dataset.peek]; render(); return; }
     if ((el = btn('[data-fdeck]'))) { pileDialog(+el.dataset.fdeck, 'fdeck'); return; }
     if ((el = btn('[data-do]'))) { doAction(el.dataset.do); return; }
@@ -1090,6 +1158,7 @@
         if (uid != null && uid !== S.hover) { S.hover = uid; updateDialog(); }
       });
       new ResizeObserver(() => fit()).observe(root);
+      wirePanels(); applyPanels();
     },
     show() { requestAnimationFrame(fit); },
   };

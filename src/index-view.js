@@ -45,7 +45,7 @@
 
   function deckSections(deck) {
     return [
-      ['Boss', [[deck.boss, 1]]],
+      ['Boss', deck.boss ? [[deck.boss, 1]] : []],
       ['Barriers', Object.entries(deck.barriers.reduce((m, id) => ({ ...m, [id]: (m[id] || 0) + 1 }), {}))],
       ['Field Deck', deck.field.map(id => [id, 1])],
       ['Main Deck', deck.main],
@@ -169,10 +169,17 @@
       <button class="chip ${opt['hide-art'] ? '' : 'on'}" data-opt="hide-art" aria-pressed="${!opt['hide-art']}">Art icons: ${opt['hide-art'] ? 'Off' : 'On'}</button>
       <button class="chip ${opt['full-text'] ? 'on' : ''}" data-opt="full-text" aria-pressed="${opt['full-text']}">Full text: ${opt['full-text'] ? 'On' : 'Off'}</button>
       <button class="chip ${opt.dark ? 'on' : ''}" data-opt="dark" aria-pressed="${opt.dark}">${opt.dark ? '☾ Dark' : '☀ Light'}</button>
-      <button class="btn btn-hot" data-create>+ Card Creator</button>`;
+      <button class="btn btn-hot" data-create>+ Card Creator</button>
+      <button class="btn btn-hot" data-builder>⚒ Deck Builder</button>`;
   }
 
   MC.IndexView = {
+    /** Re-draw after decks changed (the Deck Builder saves and deletes them). */
+    refresh() {
+      if (!root) return;
+      if (state.deck !== 'all' && !MC.DECKS[state.deck]) state.deck = 'all';
+      refresh();
+    },
     mount(el) {
       root = el;
       // Someone else's new or edited card arrived from the shared store.
@@ -212,6 +219,7 @@
         const k = e.target.closest('[data-kind]');
         if (k) { state.kind = k.dataset.kind; renderFilters(); renderGrid(); return; }
         if (e.target.closest('[data-create]')) { MC.Creator.open(null, refresh); return; }
+        if (e.target.closest('[data-builder]')) { MC.DeckBuilder.open(); return; }
         const t = e.target.closest('[data-opt]');
         if (t) { toggleOpt(t.dataset.opt); renderFilters(); return; }
         const o = e.target.closest('[data-open]');
