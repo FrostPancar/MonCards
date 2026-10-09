@@ -936,3 +936,20 @@ body.dark[data-view="index"] .db-tri .vn { fill: #c9c5ee; }
 body.dark[data-view="index"] .db-tri .vv { fill: #ebe8ff; }
 body.dark[data-view="index"] .db-tri figcaption { color: #ebe8ff; }
 body.dark[data-view="index"] .db-tri .tri-me { stroke: #ebe8ff; }
+
+.db-pop {
+  position: fixed; z-index: 80; width: 280px; max-width: calc(100vw - 16px); pointer-events: none;
+  background: #fff; color: var(--ink); border: 4px solid var(--frame, var(--blue)); border-radius: 12px;
+  box-shadow: 0 0 0 3px var(--ink), 0 10px 0 3px rgba(21, 20, 29, .2); padding: 10px 14px 12px;
+  animation: db-drop .14s ease-out;
+}
+.db-pop h4 { margin: 0 0 6px; font-size: 20px; line-height: 1.1; }
+.dp-kind { font: 700 10px var(--f-pixel); text-transform: uppercase; color: var(--ink-3); }
+.dp-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.dp-tags .tag .tag-name { display: inline; margin-left: 4px; } /* names always visible here */
+.dp-stats { font-size: 14px; color: var(--ink-2); margin-bottom: 6px; }
+.dp-stats b { color: var(--ink); }
+.dp-text { font-size: 15px; line-height: 1.3; }
+.dp-text p { margin: 0 0 6px; }
+.dp-roles { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.dp-roles span { font: 700 10px var(--f-pixel); text-transform: uppercase; border: 2px solid var(--ink); border-radius: 6px; padding: 2px 5px; background: var(--yellow); }

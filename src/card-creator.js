@@ -67,9 +67,11 @@
     // renamed tags (e.g. Grass → Nature) are mapped on every card, including ones already shared
     const norm = c => c.tags?.some(t => MC.TAG_ALIASES[t])
       ? { ...c, tags: [...new Set(c.tags.map(t => MC.TAG_ALIASES[t] || t))] } : c;
+    // roles for shared custom cards made before roles existed (see MC.ROLE_SEED in data/cards.js)
+    const seed = c => c.roles === undefined && MC.ROLE_SEED?.[c.id] ? { ...c, roles: MC.ROLE_SEED[c.id] } : c;
     MC.CARDS.splice(0, MC.CARDS.length,
       ...BASE.map(c => norm(view.edits[c.id] ? applyEdit(c, view.edits[c.id]) : c)),
-      ...view.custom.filter(c => !ORIGINAL[c.id]).map(c => norm({ ...c, custom: true })));
+      ...view.custom.filter(c => !ORIGINAL[c.id]).map(c => norm(seed({ ...c, custom: true }))));
     reindex();
   }
   rebuild();
@@ -184,7 +186,7 @@
     if (on('archetype')) card.archetype = v('archetype').trim() || 'On Destroy';
     if (tags.length) card.tags = [...new Set(tags)];
     const roles = Object.keys(MC.ROLES).filter(r => form.querySelector(`[name=role][value="${r}"]`)?.checked);
-    if (roles.length) card.roles = roles;
+    card.roles = roles;   // saved even when empty, so a deliberate "none" beats the seeded roles
     card.text = v('text').trim();
     return card;
   }
@@ -202,6 +204,7 @@
   /** The card as a JS literal for data/cards.js. */
   function toCode(card) {
     const { custom, edited, createdAt, updatedAt, ...c } = card;
+    if (!c.roles?.length) delete c.roles;
     return '  ' + JSON.stringify(c, (k, v) => v === Infinity ? '__INF__' : v)
       .replace(/"__INF__"/g, 'Infinity')
       .replace(/"([a-zA-Z]+)":/g, '$1: ').replace(/,(?=[a-z]+: )/g, ', ') + ',';

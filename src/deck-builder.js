@@ -194,7 +194,7 @@
     const v = flavorOf(deckList), n = deckList.reduce((a, [, k]) => a + k, 0);
     const top = FLAVOR.map((name, i) => [name, v[i]]).sort((a, b) => b[1] - a[1]);
     const label = n ? top.slice(0, 2).filter(t => t[1] > 0.15).map(t => t[0]).join(' · ') : '';
-    return `<figure class="db-tri db-flavor">${radar(FLAVOR.map((name, i) => [name, v[i], n ? Math.round(v[i] * 100) : null]), avg?.flavor, '#8a6ae0', 4, 360)}
+    return `<figure class="db-tri db-flavor">${radar(FLAVOR.map((name, i) => [name, v[i], n ? Math.round(v[i] * 100) : null]), avg?.flavor, '#f2c84b', 4, 360)}
       <figcaption>${label || '–'}</figcaption>
       <div class="db-legend db-leg2"><span><i class="swatch sw-me"></i>Your deck</span>${avg ? '<span><i class="swatch sw-avg"></i>Average of other decks</span>' : ''}</div></figure>`;
   }
@@ -227,8 +227,7 @@
 
   function cellHTML(c) {
     const n = st.picks[c.id] || 0;
-    const tip = `${c.name}${c.charge != null ? ` · Charge ${c.charge}` : ''}${c.cost != null ? ` · Cost ${c.cost}` : ''}`;
-    return `<div class="db-cell ${n ? 'in' : ''}" title="${MC.esc(tip)}" data-id="${c.id}">
+    return `<div class="db-cell ${n ? 'in' : ''}" data-id="${c.id}">
       <div class="db-mini" data-add="${c.id}">${MC.renderMini(c, { extraClass: 'db-card' })}</div>
       ${n ? `<span class="db-n">×${n}</span><button class="db-minus" data-sub="${c.id}" aria-label="Remove one ${MC.esc(c.name)}">−</button>` : ''}</div>`;
   }
@@ -242,7 +241,7 @@
       const rows = MC.KIND_ORDER.map(kind => {
         const ids = Object.keys(st.picks).filter(id => known(id) && MC.byId[id].kind === kind).sort((a, b) => (MC.byId[a].charge ?? -1) - (MC.byId[b].charge ?? -1) || MC.byId[a].name.localeCompare(MC.byId[b].name));
         return ids.length ? `<h4 class="db-h k-${kind}"><i class="swatch"></i>${MC.KINDS[kind].long}s <small>${ids.reduce((a, id) => a + st.picks[id], 0)}</small></h4>` +
-          ids.map(id => `<div class="db-row k-${kind}"><span class="db-rn">${MC.esc(MC.byId[id].name)}</span>${MC.byId[id].charge != null ? MC.chargePips(MC.byId[id].charge) : ''}
+          ids.map(id => `<div class="db-row k-${kind}" data-id="${id}"><span class="db-rn">${MC.esc(MC.byId[id].name)}</span>${MC.byId[id].charge != null ? MC.chargePips(MC.byId[id].charge) : ''}
             <button class="btn btn-sm" data-sub="${id}">−</button><b>${st.picks[id]}</b><button class="btn btn-sm" data-add="${id}">+</button></div>`).join('') : '';
       }).join('');
       return tabs + `<div class="db-scroll">${rows || '<p class="db-empty">No cards yet.</p>'}</div>`;
@@ -322,10 +321,36 @@
     paint();
   }
 
+  // ───────────────────────── Hover popout ─────────────────────────
+  // Full name, tags and effect text beside the hovered card (fixed-position, so the scrolling lists don't clip it).
+  let pop;
+  function hidePop() { pop?.remove(); pop = null; }
+  function showPop(el) {
+    const c = MC.byId[el.dataset.id];
+    if (!c) return hidePop();
+    if (!pop) { pop = document.createElement('div'); pop.className = 'db-pop'; document.body.appendChild(pop); }
+    const stats = [
+      MC.isMonster(c) ? `ATK <b>${c.atk}</b> · DEF <b>${c.def}</b>` : '',
+      c.charge != null ? `Charge <b>${c.charge}</b>` : '', c.cost != null ? `Cost <b>${c.cost}</b>` : '',
+      c.kind === 'action' ? `Set <b>${MC.setCostLabel(c)}</b>` : '',
+    ].filter(Boolean).join(' · ');
+    pop.className = 'db-pop k-' + c.kind;
+    pop.innerHTML = `<div class="dp-kind">${MC.esc(MC.KINDS[c.kind].long)}</div><h4>${MC.esc(c.name)}</h4>
+      ${(c.tags || []).length ? `<div class="dp-tags">${c.tags.map(MC.tagChip).join('')}</div>` : ''}
+      ${stats ? `<div class="dp-stats">${stats}</div>` : ''}
+      <div class="dp-text">${MC.formatText(c.text)}</div>
+      ${(c.roles || []).length ? `<div class="dp-roles">${c.roles.map(r => `<span>${MC.esc(r)}</span>`).join('')}</div>` : ''}`;
+    const r = el.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    let x = r.right + 12;
+    if (x + w > innerWidth - 8) x = Math.max(8, r.left - 12 - w);   // no room on the right: open to the left
+    pop.style.left = x + 'px';
+    pop.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.top + r.height / 2 - h / 2)) + 'px';
+  }
+
   function open() {
     st = fresh();
     box = MC.modal(`<div class="db-wrap"><div class="db-headwrap"></div>
-      <div class="db-cols"><div class="db-left box"></div><div class="db-right box"></div></div></div>`, { cls: 'builder', wide: true, onClose: () => MC.IndexView?.refresh?.() });
+      <div class="db-cols"><div class="db-left box"></div><div class="db-right box"></div></div></div>`, { cls: 'builder', wide: true, onClose: () => { hidePop(); MC.IndexView?.refresh?.(); } });
     paint();
 
     box.addEventListener('click', e => {
@@ -343,6 +368,13 @@
         MC.toast(`Deleted "${st.name}"`); st = fresh(); paint();
       }
     });
+    box.addEventListener('pointerover', e => {
+      if (e.pointerType === 'touch') return;
+      const el = e.target.closest('.db-cell, .db-row');
+      if (el && !e.target.closest('.db-minus')) showPop(el); else if (!e.target.closest('.db-pop')) hidePop();
+    });
+    box.addEventListener('pointerleave', hidePop);
+    box.querySelector('.db-left').addEventListener('scroll', hidePop, true);
     box.addEventListener('toggle', e => { if (e.target.matches('.db-sort')) st.openSort = e.target.open; }, true);
     box.addEventListener('contextmenu', e => {
       const el = e.target.closest('[data-add]');

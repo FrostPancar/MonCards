@@ -328,3 +328,44 @@ MC.DECKS = {
     side: [],
   },
 };
+
+/**
+ * Roles for shared custom cards made in the Card Creator (they live in the shared store, not this file).
+ * Applied only while a card has no `roles` of its own; once someone sets roles in the Card Creator
+ * (even none), those win.
+ */
+MC.ROLE_SEED = {
+  '4-leaf-clover-farmer': ['Draw'],
+  'arcane-idol': ['Consistency'],
+  'arch-hemonarch-gk6p': ['Buff/Debuff'],
+  'blazing-idol': ['Destruction'],
+  'blood-battlemage-o9v1': ['Buff/Debuff'],
+  'blood-brute-747r': ['Buff/Debuff'],
+  'blood-channeler-bo2j': ['Buff/Debuff'],
+  'blood-exchange-xzfl': ['Buff/Debuff'],
+  'blood-rush-mug7': ['Destruction'],
+  'blood-siphon-ta66': ['Buff/Debuff'],
+  'blood-urn-np19': ['Buff/Debuff'],
+  'blood-well-q5ci': ['Draw'],
+  'blood-worm-2hhp': ['Buff/Debuff'],
+  'brain-worm': ['Buff/Debuff', 'Destruction'],
+  'charity': ['Draw'],
+  'crimson-sky-cjhb': ['Buff/Debuff'],
+  'cult-initiate-a3aa': ['Buff/Debuff', 'Swarm'],
+  'cultist-gpk9': ['Swarm'],
+  'dry-plains-9j85': ['Buff/Debuff'],
+  'dual-blood-wielder-40cx': ['Buff/Debuff'],
+  'energized-barrier': ['Buff/Debuff'],
+  'energy-shield-pu93': ['Buff/Debuff'],
+  'eternal-phoenix': ['Swarm', 'Destruction'],
+  'forgotten-god': ['Swarm'],
+  'hemoglyph-tablet-1d6j': ['Swarm', 'Buff/Debuff'],
+  'mana-golem': ['Consistency'],
+  'normalize-d91y': ['Draw'],
+  'overcharge-grid-km9e': ['Buff/Debuff'],
+  'parallel-focus': ['Draw'],
+  'rock-formation-myi4': ['Consistency'],
+  'sealed-curse': ['Swarm'],
+  'terraform-mywl': ['Consistency'],
+  'unearthed-idol': ['Swarm'],
+};
