@@ -877,20 +877,18 @@ body.dark[data-view="index"] .cc-order-label { color: #a9a5cc; }
 .db-sec h3 small { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-left: 4px; }
 .db-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13.5px; font-weight: 600; margin-bottom: 2px; }
 .db-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.lg-line { width: 20px; border-top: 3px dashed var(--ink); display: inline-block; }
-.db-svg { width: 100%; height: auto; display: block; overflow: visible; }
-.db-svg .gl { stroke: #d6d8ea; stroke-width: 1; stroke-dasharray: 3 3; }
-.db-svg .ax, .db-svg .val { font: 600 10px var(--f-body); fill: var(--ink-2); }
-.db-svg .val { fill: var(--ink); font-size: 11px; }
-.db-svg .bar { stroke: var(--ink); stroke-width: 1.5; transform-box: fill-box; transform-origin: bottom; animation: db-grow .45s cubic-bezier(.3, .8, .3, 1) both; }
-@keyframes db-grow { from { transform: scaleY(0); } }
-.avg-line { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 5 3; }
-.avg-dot { fill: #fff; stroke: var(--ink); stroke-width: 2; }
-.db-diffs { display: flex; margin-top: -2px; }
-.dd { flex: 1; text-align: center; font: 700 12px var(--f-body); color: var(--ink-3); }
+.ch-rows { display: flex; flex-direction: column; gap: 4px; }
+.ch-row { display: grid; grid-template-columns: 22px 1fr 26px 38px; gap: 8px; align-items: center; font-size: 14px; font-weight: 600; }
+.ch-l { text-align: right; color: var(--ink-2); }
+.ch-bar { display: flex; height: 10px; }
+.ch-bar i { height: 100%; border: 2px solid var(--ink); border-left-width: 0; box-sizing: border-box; min-width: 4px; transition: width .35s cubic-bezier(.3, .8, .3, 1); }
+.ch-bar i:first-child { border-left-width: 2px; border-radius: 5px 0 0 5px; }
+.ch-bar i:last-child { border-radius: 0 5px 5px 0; }
+.ch-bar i:only-child { border-radius: 5px; }
+.ch-n { text-align: right; }
+.dd { text-align: center; font: 700 12px var(--f-body); color: var(--ink-3); }
 .dd.up { color: #1f7a33; } .dd.down { color: #b81d33; }
 .db-tgdd { min-width: 30px; }
-.db-note b.up { color: #1f7a33; } .db-note b.down { color: #b81d33; }
 
 .db-tris { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .db-tri { margin: 0; text-align: center; }
@@ -903,7 +901,7 @@ body.dark[data-view="index"] .cc-order-label { color: #a9a5cc; }
 .db-tri .gr { font: 600 9px var(--f-body); fill: var(--ink-2); }
 .tri-me { fill: var(--kc); fill-opacity: .6; stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; transform-box: fill-box; transform-origin: 50% 66%; animation: db-pop .45s cubic-bezier(.3, .8, .3, 1) both; }
 @keyframes db-pop { from { transform: scale(.2); opacity: 0; } }
-.tri-avg { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-dasharray: 4 3; }
+.tri-avg { fill: none; stroke: var(--ink); stroke-width: 1.2; opacity: .55; }
 .db-tri .vn { font: 700 9px var(--f-pixel); fill: var(--ink-2); }
 .db-tri .vg { font: 700 22px var(--f-num); fill: var(--red); }
 .db-tri .vv { font: 600 11px var(--f-body); fill: var(--ink-2); }
@@ -928,11 +926,7 @@ body.dark[data-view="index"] .cc-order-label { color: #a9a5cc; }
 body.dark[data-view="index"] .db-name, body.dark[data-view="index"] .db-minus { background: #11101a; color: #ebe8ff; border-color: #4a4768; }
 body.dark[data-view="index"] .db-sort { background: #262439; border-color: #4a4768; }
 body.dark[data-view="index"] .db-sort summary small, body.dark[data-view="index"] :is(.db-hint, .db-note, .db-empty, .db-sec h3 small, .db-load) { color: #a9a5cc; }
-body.dark[data-view="index"] .db-svg .ax, body.dark[data-view="index"] .db-tri .gr, body.dark[data-view="index"] .db-tri .vn, body.dark[data-view="index"] .db-tri .vv { fill: #a9a5cc; }
-body.dark[data-view="index"] .db-svg .val { fill: #ebe8ff; }
-body.dark[data-view="index"] :is(.avg-line, .tri-avg) { stroke: #ebe8ff; }
-body.dark[data-view="index"] .avg-dot { fill: #1c1a2b; stroke: #ebe8ff; }
+body.dark[data-view="index"] .tri-avg { stroke: #ebe8ff; }
 body.dark[data-view="index"] .db-tri :is(.spoke, .ring) { stroke: #6a6790; }
 body.dark[data-view="index"] .db-tri .pip { fill: #a9a5cc; }
 body.dark[data-view="index"] .db-m, body.dark[data-view="index"] .tg-bar { background: #11101a; border-color: #4a4768; }
-body.dark[data-view="index"] .db-svg .gl { stroke: #34314f; }

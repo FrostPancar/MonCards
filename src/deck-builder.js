@@ -139,33 +139,17 @@
   const delta = d => { const r = Math.round(d * 10) / 10; return r === 0 ? '±0' : (r > 0 ? '+' : '−') + Math.abs(r); };
   const dClass = d => Math.abs(d) < 0.05 ? 'same' : d > 0 ? 'up' : 'down';
 
+  /** Charge levels as thin horizontal bars (stacked by card type) with the difference from the average. */
   function chargeChart(s, avg) {
     const lv = Array.from({ length: chargeMax + 1 }, (_, i) => i);
-    const W = 360, H = 150, L = 22, R = 8, T = 14, B = 22, bw = (W - L - R) / lv.length;
-    const maxV = Math.max(4, ...lv.map(i => total(s.charge[i])), ...(avg ? lv.map(i => avg.charge[i]) : [0]));
-    const top = Math.ceil(maxV / 4) * 4;
-    const y = v => T + (H - T - B) * (1 - v / top);
-    let g = '';
-    for (let t = 0; t <= top; t += top / 4) g += `<line class="gl" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="ax" x="${L - 4}" y="${y(t) + 3}" text-anchor="end">${fmt(t)}</text>`;
-    lv.forEach((i, k) => {
-      let acc = 0;
-      for (const kind of MAIN_KINDS) {
-        const v = s.charge[i][kind];
-        if (!v) continue;
-        g += `<rect class="bar" x="${L + k * bw + bw * 0.16}" width="${bw * 0.68}" y="${y(acc + v)}" height="${y(acc) - y(acc + v)}" fill="${MC.KINDS[kind].frame}"><title>Charge ${i}: ${v} ${MC.KINDS[kind].label}</title></rect>`;
-        acc += v;
-      }
-      if (acc) g += `<text class="val" x="${L + k * bw + bw / 2}" y="${y(acc) - 3}" text-anchor="middle">${acc}</text>`;
-      g += `<text class="ax" x="${L + k * bw + bw / 2}" y="${H - 8}" text-anchor="middle">${i}${i === chargeMax ? '+' : ''}</text>`;
-    });
-    if (avg) {
-      const pts = lv.map((i, k) => `${L + k * bw + bw / 2},${y(avg.charge[i])}`);
-      g += `<polyline class="avg-line" points="${pts.join(' ')}"/>` + pts.map(p => { const [x, yy] = p.split(','); return `<circle class="avg-dot" cx="${x}" cy="${yy}" r="3"/>`; }).join('');
-    }
-    const diffs = lv.map(i => avg ? total(s.charge[i]) - avg.charge[i] : 0);
-    return `<svg class="db-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Charge curve">${g}</svg>
-      <div class="db-diffs" style="padding-left:${L / W * 100}%;padding-right:${R / W * 100}%">${lv.map((i, k) =>
-        `<span class="dd ${avg ? dClass(diffs[k]) : 'same'}" title="Charge ${i}: ${total(s.charge[i])} vs avg ${avg ? fmt(avg.charge[i]) : '–'}">${avg ? delta(diffs[k]) : ''}</span>`).join('')}</div>`;
+    const max = Math.max(4, ...lv.map(i => total(s.charge[i])), ...(avg ? lv.map(i => avg.charge[i]) : [0]));
+    return `<div class="ch-rows">${lv.map(i => {
+      const row = s.charge[i], n = total(row), d = avg ? n - avg.charge[i] : 0;
+      const segs = MAIN_KINDS.filter(k => row[k]).map(k =>
+        `<i style="width:${row[k] / max * 100}%;background:${MC.KINDS[k].frame}" title="${row[k]} ${MC.KINDS[k].label}"></i>`).join('');
+      return `<div class="ch-row" title="Charge ${i}${avg ? ': average ' + fmt(avg.charge[i]) : ''}"><span class="ch-l">${i}${i === chargeMax ? '+' : ''}</span>
+        <span class="ch-bar">${segs}</span><b class="ch-n">${n || ''}</b><span class="dd ${avg ? dClass(d) : 'same'}">${avg ? delta(d) : ''}</span></div>`;
+    }).join('')}</div>`;
   }
 
   /** Stat triangle for one card type: three axes graded E–A, your deck over the average of all decks. */
@@ -202,7 +186,7 @@
 
   function tagBars(s, avg) {
     const names = [...new Set([...Object.keys(s.tags), ...Object.entries(avg?.tags || {}).filter(([, v]) => v >= 0.5).map(([t]) => t)])];
-    if (!names.length) return '<p class="db-empty">Add cards with tags to see the counter.</p>';
+    if (!names.length) return '<p class="db-empty">No tags yet.</p>';
     names.sort((a, b) => (s.tags[b] || 0) - (s.tags[a] || 0) || (avg?.tags[b] || 0) - (avg?.tags[a] || 0));
     const max = Math.max(4, ...names.map(t => Math.max(s.tags[t] || 0, avg?.tags[t] || 0)));
     return names.map(t => {
@@ -235,18 +219,17 @@
 
   function leftHTML() {
     const tags = [...new Set(MC.CARDS.flatMap(c => c.tags || []))].sort();
-    const mainN = countPool('main');
     const tabs = `<div class="db-tabs">
       <button class="chip ${st.tab === 'index' ? 'on' : ''}" data-tab="index">Card index</button>
       <button class="chip ${st.tab === 'deck' ? 'on' : ''}" data-tab="deck">Your deck <b>${Object.values(st.picks).reduce((a, n) => a + n, 0)}</b></button></div>`;
     if (st.tab === 'deck') {
       const rows = MC.KIND_ORDER.map(kind => {
-        const ids = Object.keys(st.picks).filter(id => known(id) && MC.byId[id].kind === kind).sort((a, b) => MC.byId[a].name.localeCompare(MC.byId[b].name));
+        const ids = Object.keys(st.picks).filter(id => known(id) && MC.byId[id].kind === kind).sort((a, b) => (MC.byId[a].charge ?? -1) - (MC.byId[b].charge ?? -1) || MC.byId[a].name.localeCompare(MC.byId[b].name));
         return ids.length ? `<h4 class="db-h k-${kind}"><i class="swatch"></i>${MC.KINDS[kind].long}s <small>${ids.reduce((a, id) => a + st.picks[id], 0)}</small></h4>` +
           ids.map(id => `<div class="db-row k-${kind}"><span class="db-rn">${MC.esc(MC.byId[id].name)}</span>${MC.byId[id].charge != null ? MC.chargePips(MC.byId[id].charge) : ''}
             <button class="btn btn-sm" data-sub="${id}">−</button><b>${st.picks[id]}</b><button class="btn btn-sm" data-add="${id}">+</button></div>`).join('') : '';
       }).join('');
-      return tabs + `<div class="db-scroll">${rows || '<p class="db-empty">No cards yet. Pick some from the Card index.</p>'}</div>`;
+      return tabs + `<div class="db-scroll">${rows || '<p class="db-empty">No cards yet.</p>'}</div>`;
     }
     const cards = pickList();
     return tabs + `
@@ -261,7 +244,6 @@
             <button class="chip" data-dir>${st.dir > 0 ? 'Low → High' : 'High → Low'}</button>
             <label>Tag <select data-sel="tag"><option value="all">Any</option>${tags.map(t => `<option ${st.tag === t ? 'selected' : ''}>${MC.esc(t)}</option>`).join('')}</select></label>
           </div></div></details>
-      <p class="db-hint">Click a card to add it · <b>−</b> or right-click removes one · Main ${mainN}/${CAPS.main}</p>
       <div class="db-scroll"><div class="db-grid">${cards.map(cellHTML).join('') || '<p class="db-empty">No cards match.</p>'}</div></div>`;
   }
 
@@ -275,13 +257,13 @@
       <div class="db-meters">${bar('Main', pool('main'), CAPS.main)}${bar('Extra', pool('extra'), CAPS.extra)}${bar('Field', pool('field'), CAPS.field)}${bar('Barrier', pool('barrier'), CAPS.barrier)}
         <div class="db-meter"><span>Boss</span><span class="db-m"><i class="${deck.boss ? 'full' : ''}" style="width:${deck.boss ? 100 : 0}%"></i></span><b>${deck.boss ? MC.esc(MC.byId[deck.boss].name) : '0/1'}</b></div></div>
       <div class="legal ${problems.length ? 'warn' : 'ok'} db-legal">${problems.length ? '! ' + problems.map(MC.esc).join('<br>! ') : '✓ Deck is legal'}</div>
-      <section class="db-sec"><h3>Charge curve <small>${avg ? `bars: your deck · line: average of ${avg.decks} deck${avg.decks > 1 ? 's' : ''}${s.n ? ' (scaled to your ' + s.n + ' cards)' : ''}` : 'bars: your deck'}</small></h3>
-        <div class="db-legend">${MAIN_KINDS.map(k => `<span class="k-${k}"><i class="swatch"></i>${MC.KINDS[k].label}</span>`).join('')}${avg ? '<span><i class="lg-line"></i>Average</span>' : ''}</div>
+      <section class="db-sec"><h3>Charge curve</h3>
+        <div class="db-legend">${MAIN_KINDS.map(k => `<span class="k-${k}"><i class="swatch"></i>${MC.KINDS[k].label}</span>`).join('')}</div>
         ${chargeChart(s, avg)}
-        <p class="db-note">Under each level: <b class="up">+</b> more / <b class="down">−</b> fewer than the average.</p></section>
-      <section class="db-sec"><h3>Stat triangles <small>graded E–A against the strongest card of each type · outline: average</small></h3>
+</section>
+      <section class="db-sec"><h3>Stat triangles</h3>
         <div class="db-tris">${MAIN_KINDS.map(k => triangle(k, s, avg)).join('')}</div></section>
-      <section class="db-sec"><h3>Tags <small>copies in your Main Deck · tick: average</small></h3>${tagBars(s, avg)}</section>`;
+      <section class="db-sec"><h3>Tags</h3>${tagBars(s, avg)}</section>`;
   }
 
   function headHTML() {
