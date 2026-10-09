@@ -89,7 +89,6 @@
     'Swarm':       'Summons itself, or summons / Excavates other monsters',
     'Destruction': 'Removal: destroys or banishes cards',
     'Buff/Debuff': 'Raises or lowers monster stats, or inflicts statuses (Infect, negate, can\'t attack)',
-    'Fortitude':   'Protects: Blockers, redirects, "can\'t be destroyed" effects',
     'Consistency': 'Searches or recovers specific cards',
     'Draw':        'Draws cards, strictly',
   };

@@ -33,21 +33,23 @@
   // ───────────────────────── Deck flavor ─────────────────────────
   // Eight traits scored 0–1 from every card in the deck (Main, Extra, Field, Barriers, Boss).
   const clamp = v => Math.max(0, Math.min(1, v));
-  const FLAVOR = ['Power', 'Swarm', 'Destruction', 'Buff/Debuff', 'Fortitude', 'Monotype', 'Consistency', 'Draw'];
+  const FLAVOR = ['Power', 'Swarm', 'Destruction', 'Buff/Debuff', 'Monotype', 'Consistency', 'Draw'];
+  /** Total monster ATK + DEF that scores a full 100 Power. */
+  const POWER_FULL = 150000;
   /** Share of the deck's cards carrying a role that scores a full 100. */
-  const ROLE_FULL = { 'Swarm': 0.35, 'Destruction': 0.25, 'Buff/Debuff': 0.3, 'Fortitude': 0.3, 'Consistency': 0.25, 'Draw': 0.2 };
+  const ROLE_FULL = { 'Swarm': 0.35, 'Destruction': 0.25, 'Buff/Debuff': 0.3, 'Consistency': 0.25, 'Draw': 0.2 };
   /**
-   *   Power        average of the monsters' ATK and DEF
+   *   Power        total ATK + DEF of every monster in the deck
    *   Monotype     how much of the deck shares its most common Tag
    *   the rest     the share of cards with that role (the `roles` field, any card type)
    */
   function flavorOf(list) {
-    let n = 0, mon = 0, atk = 0, def = 0, tagged = 0;
+    let n = 0, power = 0, tagged = 0;
     const roles = {}, tags = {};
     for (const [id, k] of list) {
       const c = MC.byId[id];
       n += k;
-      if (MC.isMonster(c)) { mon += k; atk += c.atk * k; def += c.def * k; }
+      if (MC.isMonster(c)) power += (c.atk + c.def) * k;
       (c.roles || []).forEach(r => { roles[r] = (roles[r] || 0) + k; });
       if (c.tags?.length) tagged += k;
       (c.tags || []).forEach(t => { tags[t] = (tags[t] || 0) + k; });
@@ -56,8 +58,8 @@
     const top = Math.max(0, ...Object.values(tags));
     const role = r => clamp((roles[r] || 0) / n / ROLE_FULL[r]);
     return [
-      mon ? clamp((atk / mon / 2200 + def / mon / 2000) / 2) : 0,
-      role('Swarm'), role('Destruction'), role('Buff/Debuff'), role('Fortitude'),
+      clamp(power / POWER_FULL),
+      role('Swarm'), role('Destruction'), role('Buff/Debuff'),
       clamp((top / (tagged || 1) - 0.3) / 0.6),
       role('Consistency'), role('Draw'),
     ];
@@ -188,18 +190,13 @@
     return `<svg viewBox="0 0 ${W} 216" role="img">${g}</svg>`;
   }
 
-  /** How many Basic, Tribute and Action cards: one simple triangle. */
-  function mixTriangle(s) {
-    const counts = MAIN_KINDS.map(k => s.kinds[k]), top = Math.max(1, ...counts);
-    return `<figure class="db-tri">${radar(MAIN_KINDS.map((k, i) => [MC.KINDS[k].label, counts[i] / top, counts[i]]), null, '#f2c84b', 3, 280)}</figure>`;
-  }
-
   function flavorChart(deckList, avg) {
     const v = flavorOf(deckList), n = deckList.reduce((a, [, k]) => a + k, 0);
     const top = FLAVOR.map((name, i) => [name, v[i]]).sort((a, b) => b[1] - a[1]);
     const label = n ? top.slice(0, 2).filter(t => t[1] > 0.15).map(t => t[0]).join(' · ') : '';
     return `<figure class="db-tri db-flavor">${radar(FLAVOR.map((name, i) => [name, v[i], n ? Math.round(v[i] * 100) : null]), avg?.flavor, '#8a6ae0', 4, 360)}
-      <figcaption>${label || '–'}</figcaption></figure>`;
+      <figcaption>${label || '–'}</figcaption>
+      <div class="db-legend db-leg2"><span><i class="swatch sw-me"></i>Your deck</span>${avg ? '<span><i class="swatch sw-avg"></i>Average of other decks</span>' : ''}</div></figure>`;
   }
 
   function tagBars(s, avg) {
@@ -281,8 +278,8 @@
         <div class="db-legend">${MAIN_KINDS.map(k => `<span class="k-${k}"><i class="swatch"></i>${MC.KINDS[k].label}</span>`).join('')}</div>
         ${chargeChart(s, avg)}
 </section>
-      <section class="db-sec"><h3>Deck mix · Flavor</h3>
-        <div class="db-tris">${mixTriangle(s)}${flavorChart(allCards(deck), avg)}</div></section>
+      <section class="db-sec"><h3>Flavor</h3>
+        <div class="db-tris">${flavorChart(allCards(deck), avg)}</div></section>
       <section class="db-sec"><h3>Tags</h3>${tagBars(s, avg)}</section>`;
   }
 

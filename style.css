@@ -893,7 +893,7 @@ body.dark[data-view="index"] .cc-order-label { color: #a9a5cc; }
 .dd.up { color: #1f7a33; } .dd.down { color: #b81d33; }
 .db-tgdd { min-width: 30px; }
 
-.db-tris { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 8px; align-items: center; }
+.db-tris { display: block; max-width: 520px; margin: 0 auto; }
 .db-tri { margin: 0; text-align: center; }
 .db-tri svg { width: 100%; height: auto; display: block; }
 .db-tri figcaption { display: inline-flex; gap: 6px; align-items: center; font-weight: 700; font-size: 15px; }
@@ -928,3 +928,11 @@ body.dark[data-view="index"] .db-sort summary small, body.dark[data-view="index"
 body.dark[data-view="index"] .tri-avg { stroke: #ebe8ff; }
 body.dark[data-view="index"] .db-tri :is(.spoke, .ring) { stroke: #6a6790; }
 body.dark[data-view="index"] body.dark[data-view="index"] .db-m, body.dark[data-view="index"] .tg-bar { background: #11101a; border-color: #4a4768; }
+
+.db-leg2 { justify-content: center; margin: 4px 0 0; }
+.db-leg2 .sw-me { background: #8a6ae0; opacity: .75; }
+.db-leg2 .sw-avg { background: transparent; border-style: solid; }
+body.dark[data-view="index"] .db-tri .vn { fill: #c9c5ee; }
+body.dark[data-view="index"] .db-tri .vv { fill: #ebe8ff; }
+body.dark[data-view="index"] .db-tri figcaption { color: #ebe8ff; }
+body.dark[data-view="index"] .db-tri .tri-me { stroke: #ebe8ff; }
