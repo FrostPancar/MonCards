@@ -956,3 +956,5 @@ body.dark[data-view="index"] .db-tri .tri-me { stroke: #ebe8ff; }
 
 .deck-menu { position: fixed; z-index: 90; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #fff; border: 4px solid var(--blue); border-radius: 12px; box-shadow: 0 0 0 3px var(--ink), 0 8px 0 3px rgba(21, 20, 29, .2); animation: db-drop .14s ease-out; }
 .deck-menu .btn { min-width: 110px; }
+
+.sync { margin-left: auto; align-self: center; font: 700 10px var(--f-pixel); text-transform: uppercase; color: var(--ink-2); white-space: nowrap; }

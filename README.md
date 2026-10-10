@@ -23,6 +23,16 @@ Two views:
   Decks are saved in this browser (**Save deck**) and appear in the deck lists once legal.
 - **Play Table** (`#table`): a hot-seat mockup duel on a 3D pixel table. Drag cards (hand → zones, field → other zones / GY / hand / deck) or click them. It enforces zones, footprint, charge costs (including conditional Charge bonuses), Blockers, Barrier triggers, battle damage and turn-1 rules. Other card effects you apply by hand from the dialog box. Click a player's LP number to edit it. On desktop the left and right panels can be tucked away with the edge tabs to enlarge the board; they slide back in as an overlay when the pointer touches that screen edge. The hand of the player who isn't taking their turn folds away (use **Peek at hand** on their panel). It opens on a demo board; use **New duel** for the full setup flow (deck pick → field selection → draw 7).
 
+## Shared table
+
+The Play Table saves and syncs the duel for everyone. Each change is saved to `/api/table`
+(`netlify/functions/table.mts`, a site-wide Netlify Blobs store) and every open Play Table checks for
+changes every few seconds, so all players see the same board, turn, piles, LP and log. Selection, hover,
+prompts and the Peek toggle stay on each screen. If two players move at the same moment, the first save
+wins and the other screen updates to it. **New duel** starts a fresh shared table for everyone. Add
+`?room=name` to the URL to use a separate table. The status chip in the Turn box shows **Shared** or
+**Local only** (opening `index.html` from disk has no server, so it stays local).
+
 ## Layout
 
 | Path | What |
@@ -30,6 +40,7 @@ Two views:
 | `data/cards.js` | Card database (`MC.CARDS`) and sample decks (`MC.DECKS`). Edit this to add cards. |
 | `src/core.js` | Card rendering, procedural pixel art, icons, deck validation |
 | `src/card-creator.js` | Card Creator form, shared card store client (cache, offline queue, sync) |
+| `netlify/functions/table.mts` | `/api/table`: the shared Play Table state |
 | `netlify/functions/cards.mts` | `/api/cards`: shared custom cards and edits (Netlify Blobs) |
 | `src/deck-builder.js` | Deck Builder panel, deck stats and saved decks |
 | `src/index-view.js` | Card Index view |

@@ -21,7 +21,7 @@
   function newPlayer(deckKey, name) {
     const d = MC.DECKS[deckKey];
     return {
-      name, deckKey, lp: 6000,
+      name, deckKey, deckName: d.name, lp: 6000,
       deck: shuffle(MC.expand(d.main).map(mk)),
       hand: [], gy: [],
       exgy: [],                             // Extra Deck graveyard
@@ -657,7 +657,7 @@
     const up = p.barriers.filter(b => !b.faceDown || b.rubble).length;
     return `<div class="box plate ${S.active === pi ? 'is-active' : ''} ${direct ? 'target' : ''}" data-plate="${pi}">
       <span class="box-tab">${MC.esc(p.name)}${S.active === pi ? ' ▸' : ''}</span>
-      <div class="plate-deck">${MC.esc(MC.DECKS[p.deckKey].name)}</div>
+      <div class="plate-deck">${MC.esc(MC.DECKS[p.deckKey]?.name ?? p.deckName ?? '')}</div>
       <label class="lp">${MC.icon('heart')}<input class="lp-input" type="number" min="0" step="100" value="${p.lp}"
         data-lpinput="${pi}" aria-label="${MC.esc(p.name)} Life Points" title="Click to edit LP"><span>LP</span></label>
       <div class="lp-bar"><i style="width:${Math.min(100, p.lp / 60)}%"></i></div>
@@ -803,6 +803,7 @@
             <div class="turn-btns">
               <button class="btn btn-sm" data-draw>Draw</button>
               <button class="btn btn-sm" data-newduel>New duel</button>
+              <span class="sync" title="${MC.esc(Sync.hint())}">${Sync.label()}</span>
             </div>
           </div>
           ${plateHTML(0)}
@@ -835,6 +836,7 @@
       root.querySelectorAll('[data-handwrap]').forEach(w => w.classList.toggle('collapsed', !now[+w.dataset.handwrap]));
     }
     prevVis = now;
+    Sync.changed();
     const stage = root.querySelector('.stage');
     stageRO.disconnect(); stageRO.observe(stage);
     fit();
@@ -1126,6 +1128,113 @@
     }
   }
 
+
+  // ───────────────────────── Shared table ─────────────────────────
+  // The duel is saved to /api/table and every open Play Table polls it, so all players see the same board.
+  // Only the game itself is shared (turn, piles, zones, LP, log); selection, hover, prompts and
+  // the Peek toggle stay on each screen.
+  const Sync = (() => {
+    const API = '/api/table', ROOM = new URLSearchParams(location.search).get('room') || 'main', POLL_MS = 2500;
+    let rev = 0, lastJSON = '', status = 'off', timer = null, pushing = false, polling = false;
+    const online = () => /^https?:$/.test(location.protocol);
+
+    /** The shared part of the state as plain JSON (cards by id; Sets as arrays). */
+    const snapshot = () => ({
+      turn: S.turn, active: S.active, phase: S.phase, over: S.over, log: S.log, uidSeq,
+      players: S.players,
+    });
+    const encode = () => JSON.stringify(snapshot(), (k, v) => k === 'card' ? undefined : v instanceof Set ? { $set: [...v] } : v);
+
+    /** Rebuild a state from JSON; null when a card isn't known on this device yet (e.g. a new custom card). */
+    function decode(state) {
+      let missing = false;
+      const raw = JSON.parse(JSON.stringify(state), (k, v) => {
+        if (v && typeof v === 'object' && Array.isArray(v.$set)) return new Set(v.$set);
+        if (v && typeof v === 'object' && typeof v.uid === 'number' && typeof v.id === 'string') {
+          v.card = MC.byId[v.id];
+          if (!v.card) missing = true;
+        }
+        return v;
+      });
+      return missing ? null : raw;
+    }
+
+    function setStatus(s) {
+      if (s === status) return;
+      status = s;
+      const el = root?.querySelector('.sync');
+      if (el) { el.textContent = label(); el.title = hint(); }
+    }
+    const label = () => ({ live: '● Shared', saving: '● Saving…', off: '○ Local only' }[status]);
+    const hint = () => status === 'off'
+      ? 'Not connected to the shared table. Changes stay on this device until the server can be reached.'
+      : 'This table is saved and shared with everyone who has the Play Table open.';
+
+    /** Replace the local table with the server's. */
+    function adopt(state, newRev) {
+      const next = decode(state);
+      if (!next) return false;
+      uidSeq = Math.max(uidSeq, next.uidSeq || 1);
+      S = { ...next, sel: null, hover: null, mode: null, prompt: null, peek: [false, false], drag: null };
+      rev = newRev;
+      lastJSON = encode();   // equals the server's, so rendering it doesn't echo a save
+      MC.hideCardPop?.();
+      render();
+      return true;
+    }
+
+    async function pull(initial) {
+      if (!online() || polling || document.hidden && !initial) return;
+      if (drag?.started) return;             // don't pull the table out from under a drag
+      polling = true;
+      try {
+        const res = await fetch(`${API}?room=${ROOM}&rev=${rev}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(res.status);
+        const data = await res.json();
+        setStatus('live');
+        if (data.rev === 0 && rev === 0) { if (initial) await push(true); }       // nothing saved yet: save the table we have
+        else if (data.rev !== rev && data.state && (initial || encode() === lastJSON)) {          // someone else moved, nothing of ours pending
+          if (adopt(data.state, data.rev) && !initial) MC.toast('Table updated by another player');
+        }
+      } catch (e) { setStatus('off'); }
+      polling = false;
+    }
+
+    async function push(force) {
+      if (!online() || pushing || !S) return;
+      const json = encode();
+      if (!force && json === lastJSON) return;
+      pushing = true; setStatus('saving');
+      try {
+        const res = await fetch(API, { method: 'PUT', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ room: ROOM, baseRev: rev, state: JSON.parse(json) }) });
+        if (res.status === 409) {
+          const cur = await res.json();       // someone saved first: theirs wins
+          if (cur.state && adopt(cur.state, cur.rev)) MC.toast('Another player moved first, so the table was updated');
+        } else if (res.ok) {
+          const data = await res.json();
+          rev = data.rev; lastJSON = json; setStatus('live');
+        } else throw new Error(res.status);
+      } catch (e) { setStatus('off'); }
+      pushing = false;
+      if (S && encode() !== lastJSON && status !== 'off') schedule();   // more changes landed while saving
+    }
+
+    function schedule() { clearTimeout(timer); timer = setTimeout(() => push(), 350); }
+
+    return {
+      label, hint,
+      /** Called after every render: save when the shared part of the table changed. */
+      changed() { if (online() && S && encode() !== lastJSON) schedule(); },
+      start() {
+        if (!online()) return;
+        pull(true);
+        setInterval(() => pull(), POLL_MS);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
+      },
+    };
+  })();
+
   // ───────────────────────── Deck menu ─────────────────────────
   // Clicking a Deck (any phase) offers Draw or View, stacked beside the pile.
   let deckMenu;
@@ -1191,6 +1300,7 @@
       root.addEventListener('mouseleave', () => MC.hideCardPop());
       new ResizeObserver(() => fit()).observe(root);
       wirePanels(); applyPanels();
+      Sync.start();
     },
     show() { requestAnimationFrame(fit); },
   };
