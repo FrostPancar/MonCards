@@ -953,3 +953,6 @@ body.dark[data-view="index"] .db-tri .tri-me { stroke: #ebe8ff; }
 .dp-text p { margin: 0 0 6px; }
 .dp-roles { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .dp-roles span { font: 700 10px var(--f-pixel); text-transform: uppercase; border: 2px solid var(--ink); border-radius: 6px; padding: 2px 5px; background: var(--yellow); }
+
+.deck-menu { position: fixed; z-index: 90; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #fff; border: 4px solid var(--blue); border-radius: 12px; box-shadow: 0 0 0 3px var(--ink), 0 8px 0 3px rgba(21, 20, 29, .2); animation: db-drop .14s ease-out; }
+.deck-menu .btn { min-width: 110px; }

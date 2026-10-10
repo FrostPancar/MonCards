@@ -502,6 +502,34 @@
     </div>`;
   };
 
+  // ───────────────────────── Hover popout ─────────────────────────
+  // Full name, tags and effect text beside a hovered card (fixed-position, so scrolling lists and the 3D table don't clip it).
+  // opts: { atk, def, charge } override the printed numbers (live values on the table).
+  let pop;
+  MC.hideCardPop = () => { pop?.remove(); pop = null; };
+  MC.showCardPop = function (anchor, c, opts = {}) {
+    if (!c || !anchor?.isConnected) return MC.hideCardPop();
+    if (pop && pop._anchor === anchor && pop._key === c.id + JSON.stringify(opts)) return;   // already showing
+    if (!pop) { pop = document.createElement('div'); document.body.appendChild(pop); }
+    pop._anchor = anchor; pop._key = c.id + JSON.stringify(opts);
+    const stats = [
+      MC.isMonster(c) ? `ATK <b>${opts.atk ?? c.atk}</b> · DEF <b>${opts.def ?? c.def}</b>` : '',
+      (opts.charge ?? c.charge) != null ? `Charge <b>${opts.charge ?? c.charge}</b>` : '', c.cost != null ? `Cost <b>${c.cost}</b>` : '',
+      c.kind === 'action' ? `Set <b>${MC.setCostLabel(c)}</b>` : '',
+    ].filter(Boolean).join(' · ');
+    pop.className = 'db-pop k-' + c.kind;
+    pop.innerHTML = `<div class="dp-kind">${MC.esc(MC.KINDS[c.kind].long)}</div><h4>${MC.esc(c.name)}</h4>
+      ${(c.tags || []).length ? `<div class="dp-tags">${c.tags.map(MC.tagChip).join('')}</div>` : ''}
+      ${stats ? `<div class="dp-stats">${stats}</div>` : ''}
+      <div class="dp-text">${MC.formatText(c.text)}</div>
+      ${(c.roles || []).length ? `<div class="dp-roles">${c.roles.map(r => `<span>${MC.esc(r)}</span>`).join('')}</div>` : ''}`;
+    const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    let x = r.right + 12;
+    if (x + w > innerWidth - 8) x = Math.max(8, r.left - 12 - w);   // no room on the right: open to the left
+    pop.style.left = x + 'px';
+    pop.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.top + r.height / 2 - h / 2)) + 'px';
+  };
+
   // ───────────────────────── Deck helpers ─────────────────────────
   MC.expand = list => list.flatMap(([id, n]) => Array(n).fill(id));
   MC.count = list => list.reduce((s, [, n]) => s + n, 0);

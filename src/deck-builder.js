@@ -321,36 +321,10 @@
     paint();
   }
 
-  // ───────────────────────── Hover popout ─────────────────────────
-  // Full name, tags and effect text beside the hovered card (fixed-position, so the scrolling lists don't clip it).
-  let pop;
-  function hidePop() { pop?.remove(); pop = null; }
-  function showPop(el) {
-    const c = MC.byId[el.dataset.id];
-    if (!c) return hidePop();
-    if (!pop) { pop = document.createElement('div'); pop.className = 'db-pop'; document.body.appendChild(pop); }
-    const stats = [
-      MC.isMonster(c) ? `ATK <b>${c.atk}</b> · DEF <b>${c.def}</b>` : '',
-      c.charge != null ? `Charge <b>${c.charge}</b>` : '', c.cost != null ? `Cost <b>${c.cost}</b>` : '',
-      c.kind === 'action' ? `Set <b>${MC.setCostLabel(c)}</b>` : '',
-    ].filter(Boolean).join(' · ');
-    pop.className = 'db-pop k-' + c.kind;
-    pop.innerHTML = `<div class="dp-kind">${MC.esc(MC.KINDS[c.kind].long)}</div><h4>${MC.esc(c.name)}</h4>
-      ${(c.tags || []).length ? `<div class="dp-tags">${c.tags.map(MC.tagChip).join('')}</div>` : ''}
-      ${stats ? `<div class="dp-stats">${stats}</div>` : ''}
-      <div class="dp-text">${MC.formatText(c.text)}</div>
-      ${(c.roles || []).length ? `<div class="dp-roles">${c.roles.map(r => `<span>${MC.esc(r)}</span>`).join('')}</div>` : ''}`;
-    const r = el.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
-    let x = r.right + 12;
-    if (x + w > innerWidth - 8) x = Math.max(8, r.left - 12 - w);   // no room on the right: open to the left
-    pop.style.left = x + 'px';
-    pop.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.top + r.height / 2 - h / 2)) + 'px';
-  }
-
   function open() {
     st = fresh();
     box = MC.modal(`<div class="db-wrap"><div class="db-headwrap"></div>
-      <div class="db-cols"><div class="db-left box"></div><div class="db-right box"></div></div></div>`, { cls: 'builder', wide: true, onClose: () => { hidePop(); MC.IndexView?.refresh?.(); } });
+      <div class="db-cols"><div class="db-left box"></div><div class="db-right box"></div></div></div>`, { cls: 'builder', wide: true, onClose: () => { MC.hideCardPop(); MC.IndexView?.refresh?.(); } });
     paint();
 
     box.addEventListener('click', e => {
@@ -371,10 +345,10 @@
     box.addEventListener('pointerover', e => {
       if (e.pointerType === 'touch') return;
       const el = e.target.closest('.db-cell, .db-row');
-      if (el && !e.target.closest('.db-minus')) showPop(el); else if (!e.target.closest('.db-pop')) hidePop();
+      if (el && !e.target.closest('.db-minus')) MC.showCardPop(el, MC.byId[el.dataset.id]); else MC.hideCardPop();
     });
-    box.addEventListener('pointerleave', hidePop);
-    box.querySelector('.db-left').addEventListener('scroll', hidePop, true);
+    box.addEventListener('pointerleave', () => MC.hideCardPop());
+    box.querySelector('.db-left').addEventListener('scroll', () => MC.hideCardPop(), true);
     box.addEventListener('toggle', e => { if (e.target.matches('.db-sort')) st.openSort = e.target.open; }, true);
     box.addEventListener('contextmenu', e => {
       const el = e.target.closest('[data-add]');

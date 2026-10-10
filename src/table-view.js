@@ -788,6 +788,7 @@
 
   function render() {
     if (!S) return;
+    MC.hideCardPop();
     const wasLeft = root.querySelector('.hud')?.scrollTop;
     root.innerHTML = `
       <div class="table-layout ${panelClasses()}">
@@ -977,6 +978,7 @@
     if (!drag.started) {
       if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
       drag.started = true;
+      MC.hideCardPop();
       const ghost = document.createElement('div');
       ghost.className = 'drag-ghost';
       ghost.innerHTML = drag.el.outerHTML;
@@ -1112,7 +1114,7 @@
     const pz = btn('[data-pilezone]');
     if (pz) {
       const which = pz.dataset.pilezone, pi = +pz.dataset.pi;
-      if (which === 'deck' && pi === S.active && S.phase === 0) { draw(P(pi)); render(); return; }
+      if (which === 'deck') { openDeckMenu(pi, pz); return; }
       pileDialog(pi, which); return;
     }
     const c = btn('[data-uid]');
@@ -1123,6 +1125,29 @@
       render();
     }
   }
+
+  // ───────────────────────── Deck menu ─────────────────────────
+  // Clicking a Deck (any phase) offers Draw or View, stacked beside the pile.
+  let deckMenu;
+  function closeDeckMenu() { deckMenu?.remove(); deckMenu = null; }
+  function openDeckMenu(pi, anchor) {
+    closeDeckMenu(); MC.hideCardPop();
+    deckMenu = document.createElement('div');
+    deckMenu.className = 'deck-menu';
+    deckMenu.innerHTML = `<button class="btn btn-hot" data-dm="draw">Draw</button><button class="btn" data-dm="view">View</button>`;
+    document.body.appendChild(deckMenu);
+    const r = anchor.getBoundingClientRect(), w = deckMenu.offsetWidth, h = deckMenu.offsetHeight;
+    deckMenu.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+    deckMenu.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.top + r.height / 2 - h / 2)) + 'px';
+    deckMenu.addEventListener('click', e => {
+      const act = e.target.closest('[data-dm]')?.dataset.dm;
+      if (!act) return;
+      closeDeckMenu();
+      if (act === 'draw') { draw(P(pi)); render(); } else pileDialog(pi, 'deck');
+    });
+  }
+  document.addEventListener('pointerdown', e => { if (deckMenu && !deckMenu.contains(e.target)) closeDeckMenu(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDeckMenu(); });
 
   MC.TableView = {
     mount(el) {
@@ -1157,7 +1182,13 @@
         const c = e.target.closest('[data-uid]');
         const uid = c ? +c.dataset.uid : null;
         if (uid != null && uid !== S.hover) { S.hover = uid; updateDialog(); }
+        // same descriptive panel as the Deck Builder (never for a hidden hand)
+        const mini = e.target.closest('.mini[data-uid]'), loc = mini && locate(+mini.dataset.uid);
+        if (!loc || (loc.where === 'hand' && S.active !== loc.pi && !S.peek[loc.pi])) { MC.hideCardPop(); return; }
+        const live = loc.where === 'mon';
+        MC.showCardPop(mini, loc.inst.card, live ? { atk: atk(loc.inst), def: def(loc.inst), charge: charge(loc.inst, loc.pi) } : {});
       });
+      root.addEventListener('mouseleave', () => MC.hideCardPop());
       new ResizeObserver(() => fit()).observe(root);
       wirePanels(); applyPanels();
     },
