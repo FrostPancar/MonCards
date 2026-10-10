@@ -788,7 +788,7 @@
 
   function render() {
     if (!S) return;
-    MC.hideCardPop();
+    MC.hideCardPop(); closeMenu();
     const wasLeft = root.querySelector('.hud')?.scrollTop;
     root.innerHTML = `
       <div class="table-layout ${panelClasses()}">
@@ -1123,8 +1123,13 @@
     if (c) {
       const uid = +c.dataset.uid, loc = locate(uid);
       if (loc.where === 'hand' && S.active !== loc.pi && !S.peek[loc.pi]) { MC.toast('Hidden hand — use Peek'); return; }
-      S.sel = S.sel === uid ? null : uid;
+      // Field and hand cards always (re)open their option buttons; other cards toggle selection
+      const menuCard = loc.where === 'hand' || loc.where === 'field';
+      S.sel = S.sel === uid && !menuCard ? null : uid;
       render();
+      if (menuCard) {
+        openMenu(root.querySelector(`.mini[data-uid="${uid}"]`), loc.where === 'hand' ? handMenu(loc) : fieldMenu(loc), loc.where === 'hand' ? 'above' : 'side');
+      }
     }
   }
 
@@ -1235,28 +1240,60 @@
     };
   })();
 
-  // ───────────────────────── Deck menu ─────────────────────────
-  // Clicking a Deck (any phase) offers Draw or View, stacked beside the pile.
-  let deckMenu;
-  function closeDeckMenu() { deckMenu?.remove(); deckMenu = null; }
-  function openDeckMenu(pi, anchor) {
-    closeDeckMenu(); MC.hideCardPop();
-    deckMenu = document.createElement('div');
-    deckMenu.className = 'deck-menu';
-    deckMenu.innerHTML = `<button class="btn btn-hot" data-dm="draw">Draw</button><button class="btn" data-dm="view">View</button>`;
-    document.body.appendChild(deckMenu);
-    const r = anchor.getBoundingClientRect(), w = deckMenu.offsetWidth, h = deckMenu.offsetHeight;
-    deckMenu.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
-    deckMenu.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.top + r.height / 2 - h / 2)) + 'px';
-    deckMenu.addEventListener('click', e => {
-      const act = e.target.closest('[data-dm]')?.dataset.dm;
-      if (!act) return;
-      closeDeckMenu();
-      if (act === 'draw') { draw(P(pi)); render(); } else pileDialog(pi, 'deck');
+  // ───────────────────────── Pop-up menus ─────────────────────────
+  // Small stacked button menus beside a clicked Deck, Field card or hand card.
+  let menu;
+  function closeMenu() { menu?.remove(); menu = null; }
+  /** items: [{ label, hot, run }]; place: 'side' (right, else left) or 'above'. */
+  function openMenu(anchor, items, place = 'side') {
+    closeMenu(); MC.hideCardPop();
+    if (!anchor || !items.length) return;
+    menu = document.createElement('div');
+    menu.className = 'deck-menu';
+    menu.innerHTML = items.map((it, i) => `<button class="btn ${it.hot ? 'btn-hot' : ''}" data-mi="${i}">${it.label}</button>`).join('');
+    document.body.appendChild(menu);
+    const r = anchor.getBoundingClientRect(), w = menu.offsetWidth, h = menu.offsetHeight;
+    let x, y;
+    if (place === 'above') { x = r.left + r.width / 2 - w / 2; y = r.top - h - 14; if (y < 8) y = r.bottom + 10; }
+    else { x = r.right + 10; if (x + w > innerWidth - 8) x = r.left - 10 - w; y = r.top + r.height / 2 - h / 2; }
+    menu.style.left = Math.max(8, Math.min(innerWidth - w - 8, x)) + 'px';
+    menu.style.top = Math.max(8, Math.min(innerHeight - h - 8, y)) + 'px';
+    menu.addEventListener('click', e => {
+      const it = items[e.target.closest('[data-mi]')?.dataset.mi];
+      if (!it) return;
+      closeMenu();
+      it.run();
     });
   }
-  document.addEventListener('pointerdown', e => { if (deckMenu && !deckMenu.contains(e.target)) closeDeckMenu(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDeckMenu(); });
+  document.addEventListener('pointerdown', e => { if (menu && !menu.contains(e.target)) closeMenu(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+
+  /** Clicking a Deck (any phase) offers Draw or View. */
+  function openDeckMenu(pi, anchor) {
+    openMenu(anchor, [
+      { label: 'Draw', hot: true, run: () => { draw(P(pi)); render(); } },
+      { label: 'View', run: () => pileDialog(pi, 'deck') },
+    ]);
+  }
+
+  /** Clicking a Field card offers Switch (swap with another from the Field Deck) or Flip. */
+  function fieldMenu(loc) {
+    return [
+      { label: 'Switch', run: () => pileDialog(loc.pi, 'fdeck') },
+      { label: loc.slot?.faceDown ? 'Flip up' : 'Flip down', hot: true, run: () => doAction('flip') },
+    ];
+  }
+
+  /** Clicking a hand card offers what it can do. */
+  function handMenu(loc) {
+    const c = loc.inst.card, d = (act, label, hot) => ({ label, hot, run: () => doAction(act) });
+    const out = [];
+    if (c.kind === 'basic') out.push(d('summon', 'Summon', true));
+    if (c.kind === 'tribute') out.push(d('tribute-summon', `Tribute Summon (${c.cost})`, true));
+    if (c.kind === 'action') out.push(d('activate', `Activate (${c.cost})`, true), d('set', 'Set'));
+    out.push(d('discard', 'Discard'));
+    return out;
+  }
 
   MC.TableView = {
     mount(el) {
