@@ -958,3 +958,9 @@ body.dark[data-view="index"] .db-tri .tri-me { stroke: #ebe8ff; }
 .deck-menu .btn { min-width: 110px; }
 
 .sync { margin-left: auto; align-self: center; font: 700 10px var(--f-pixel); text-transform: uppercase; color: var(--ink-2); white-space: nowrap; }
+
+/* Hover Info toggle: bottom right, on the table and while the Deck Builder is open */
+#hover-toggle { display: none; position: fixed; right: 12px; bottom: 10px; z-index: 70; font-size: 13px; padding: 4px 10px; }
+body[data-view="table"] #hover-toggle, body.builder-open #hover-toggle { display: block; }
+#hover-toggle.on { background: var(--yellow); }
+@media (min-width: 1000px) { .table-layout .dialog-slot { padding-bottom: 44px; } }

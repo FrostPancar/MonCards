@@ -506,9 +506,11 @@
   // Full name, tags and effect text beside a hovered card (fixed-position, so scrolling lists and the 3D table don't clip it).
   // opts: { atk, def, charge } override the printed numbers (live values on the table).
   let pop;
+  /** The "Hover Info" toggle (bottom right): turns the popout off or on everywhere. */
+  try { MC.hoverInfo = localStorage.getItem('mc-hover-info') !== '0'; } catch (e) { MC.hoverInfo = true; }
   MC.hideCardPop = () => { pop?.remove(); pop = null; };
   MC.showCardPop = function (anchor, c, opts = {}) {
-    if (!c || !anchor?.isConnected) return MC.hideCardPop();
+    if (!MC.hoverInfo || !c || !anchor?.isConnected) return MC.hideCardPop();
     if (pop && pop._anchor === anchor && pop._key === c.id + JSON.stringify(opts)) return;   // already showing
     if (!pop) { pop = document.createElement('div'); document.body.appendChild(pop); }
     pop._anchor = anchor; pop._key = c.id + JSON.stringify(opts);

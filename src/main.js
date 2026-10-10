@@ -30,6 +30,17 @@
     toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
   };
 
+  // "Hover Info" toggle: the card popout beside hovered cards (table and Deck Builder).
+  const hv = document.getElementById('hover-toggle');
+  const paintHover = () => { hv.textContent = `Hover Info: ${MC.hoverInfo ? 'On' : 'Off'}`; hv.setAttribute('aria-pressed', MC.hoverInfo); hv.classList.toggle('on', MC.hoverInfo); };
+  hv.addEventListener('click', () => {
+    MC.hoverInfo = !MC.hoverInfo;
+    try { localStorage.setItem('mc-hover-info', MC.hoverInfo ? '1' : '0'); } catch (e) { /* storage blocked */ }
+    if (!MC.hoverInfo) MC.hideCardPop();
+    paintHover();
+  });
+  paintHover();
+
   const views = { index: MC.IndexView, table: MC.TableView };
   const mounted = {};
   function route() {

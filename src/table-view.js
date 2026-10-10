@@ -1124,11 +1124,12 @@
       const uid = +c.dataset.uid, loc = locate(uid);
       if (loc.where === 'hand' && S.active !== loc.pi && !S.peek[loc.pi]) { MC.toast('Hidden hand — use Peek'); return; }
       // Field and hand cards always (re)open their option buttons; other cards toggle selection
-      const menuCard = loc.where === 'hand' || loc.where === 'field';
+      const menuCard = ['hand', 'field', 'bar', 'rubble'].includes(loc.where);
       S.sel = S.sel === uid && !menuCard ? null : uid;
       render();
       if (menuCard) {
-        openMenu(root.querySelector(`.mini[data-uid="${uid}"]`), loc.where === 'hand' ? handMenu(loc) : fieldMenu(loc), loc.where === 'hand' ? 'above' : 'side');
+        openMenu(root.querySelector(`.mini[data-uid="${uid}"]`),
+          loc.where === 'hand' ? handMenu(loc) : loc.where === 'field' ? fieldMenu(loc) : barrierMenu(loc), loc.where === 'hand' ? 'above' : 'side');
       }
     }
   }
@@ -1282,6 +1283,15 @@
       { label: 'Switch', run: () => pileDialog(loc.pi, 'fdeck') },
       { label: loc.slot?.faceDown ? 'Flip up' : 'Flip down', hot: true, run: () => doAction('flip') },
     ];
+  }
+
+  /** Clicking a Barrier offers Flip (up, or down to destroy); a Rubble card offers Excavate / Send to GY. */
+  function barrierMenu(loc) {
+    if (loc.where === 'rubble') return [
+      { label: 'Excavate', hot: true, run: () => doAction('excavate') },
+      { label: 'Send to GY', run: () => doAction('rubble-gy') },
+    ];
+    return [{ label: loc.slot?.faceDown ? 'Flip up' : 'Flip down', hot: true, run: () => doAction('flip') }];
   }
 
   /** Clicking a hand card offers what it can do. */

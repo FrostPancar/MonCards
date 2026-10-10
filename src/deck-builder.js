@@ -323,8 +323,9 @@
 
   function open() {
     st = fresh();
+    document.body.classList.add('builder-open');
     box = MC.modal(`<div class="db-wrap"><div class="db-headwrap"></div>
-      <div class="db-cols"><div class="db-left box"></div><div class="db-right box"></div></div></div>`, { cls: 'builder', wide: true, onClose: () => { MC.hideCardPop(); MC.IndexView?.refresh?.(); } });
+      <div class="db-cols"><div class="db-left box"></div><div class="db-right box"></div></div></div>`, { cls: 'builder', wide: true, onClose: () => { document.body.classList.remove('builder-open'); MC.hideCardPop(); MC.IndexView?.refresh?.(); } });
     paint();
 
     box.addEventListener('click', e => {
