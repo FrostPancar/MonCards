@@ -18,10 +18,14 @@
   let S, root;
 
   // ───────────────────────── State ─────────────────────────
-  function newPlayer(deckKey, name) {
-    const d = MC.DECKS[deckKey];
+  /** deck: a key of MC.DECKS, or a deck object (multiplayer sends the deck itself, since saved decks live in each browser). */
+  function newPlayer(deck, name, playerId) {
+    const d = { ...(typeof deck === 'string' ? MC.DECKS[deck] : deck) };
+    const ok = id => !!MC.byId[id];
+    d.main = d.main.filter(([id]) => ok(id)); d.extra = d.extra.filter(([id]) => ok(id));
+    d.field = d.field.filter(ok); d.barriers = d.barriers.filter(ok);
     return {
-      name, deckKey, deckName: d.name, lp: 6000,
+      name, deckKey: typeof deck === 'string' ? deck : null, deckName: d.name, playerId: playerId || null, lp: 6000,
       deck: shuffle(MC.expand(d.main).map(mk)),
       hand: [], gy: [],
       exgy: [],                             // Extra Deck graveyard
@@ -36,10 +40,10 @@
     };
   }
 
-  function newDuel(deckA, deckB) {
+  function newDuel(deckA, deckB, { names = ['Player 1', 'Player 2'], ids = [] } = {}) {
     S = {
       turn: 1, active: 0, phase: 0,
-      players: [newPlayer(deckA, 'Player 1'), newPlayer(deckB, 'Player 2')],
+      players: [newPlayer(deckA, names[0], ids[0]), newPlayer(deckB, names[1], ids[1])],
       sel: null, hover: null, mode: null, prompt: null, peek: [false, false], log: [], over: false, drag: null,
     };
     S.players.forEach(p => { for (let i = 0; i < 7; i++) draw(p, true); });
@@ -452,7 +456,10 @@
       <label>Player 1 deck <select name="a">${opts('hive')}</select></label>
       <label>Player 2 deck <select name="b">${opts('fungus')}</select></label>
       <p class="note">Each player picks a Field card after seeing the opponent's deck. Then decks are shuffled and both players draw 7.</p>
-      <button class="btn btn-hot" data-go>Start duel</button></div>`);
+      <div class="newduel-btns"><button class="btn btn-hot" data-go>Start duel</button>
+        <button class="btn" data-mp>⚔ Multiplayer</button></div>
+      <p class="note">Multiplayer: play someone on another device. Each of you only sees your own hand.</p></div>`);
+    box.querySelector('[data-mp]').onclick = () => MP.joinDialog();
     box.querySelector('[data-go]').onclick = () => {
       const a = box.querySelector('[name=a]').value, b = box.querySelector('[name=b]').value;
       MC.closeModal();
@@ -470,7 +477,7 @@
     const p = P(pi), o = P(opp(pi));
     const box = MC.modal(`<span class="eyebrow">${MC.esc(p.name)} · Field selection</span>
       <h2>Choose your Field card</h2>
-      <p class="note">Opponent is playing <b>${MC.esc(MC.DECKS[o.deckKey].name)}</b>. Your choice is placed face-down.</p>
+      <p class="note">Opponent is playing <b>${MC.esc(o.deckName)}</b>. Your choice is placed face-down.</p>
       <div class="pick-grid">${p.fieldDeck.map(f => `<button class="card-cell" data-pick="${f.uid}">${MC.renderCard(f.card)}</button>`).join('')}</div>`, { wide: true });
     box.addEventListener('click', e => {
       const b = e.target.closest('[data-pick]');
@@ -593,7 +600,7 @@
   }
 
   function sideHTML(pi) {
-    const p = P(pi), mirror = pi === 1;
+    const p = P(pi), mirror = pi !== bottomPi();   // the far side is drawn mirrored
     const m = S.mode;
     const placing = m?.type === 'place' && m.pi === pi;
     const starts = placing && m.zone === 'mon' ? cardZones(p, m.n, m.uid) : new Set();
@@ -656,7 +663,7 @@
     const direct = isTarget(pi, 'direct');
     const up = p.barriers.filter(b => !b.faceDown || b.rubble).length;
     return `<div class="box plate ${S.active === pi ? 'is-active' : ''} ${direct ? 'target' : ''}" data-plate="${pi}">
-      <span class="box-tab">${MC.esc(p.name)}${S.active === pi ? ' ▸' : ''}</span>
+      <span class="box-tab">${MC.esc(p.name)}${MP.inMatch() && pi === MP.seat() ? ' (you)' : ''}${S.active === pi ? ' ▸' : ''}</span>
       <div class="plate-deck">${MC.esc(MC.DECKS[p.deckKey]?.name ?? p.deckName ?? '')}</div>
       <label class="lp">${MC.icon('heart')}<input class="lp-input" type="number" min="0" step="100" value="${p.lp}"
         data-lpinput="${pi}" aria-label="${MC.esc(p.name)} Life Points" title="Click to edit LP"><span>LP</span></label>
@@ -665,23 +672,28 @@
         <li>Hand <b>${p.hand.length}</b></li><li>Deck <b>${p.deck.length}</b></li>
         <li>GY <b>${p.gy.length}</b></li><li>Barriers <b>${up}/4</b></li>
       </ul>
-      ${S.active !== pi ? `<button class="btn btn-sm plate-peek" data-peek="${pi}">${S.peek[pi] ? 'Hide hand' : 'Peek at hand'}</button>` : ''}
+      ${S.active !== pi && !MP.inMatch() ? `<button class="btn btn-sm plate-peek" data-peek="${pi}">${S.peek[pi] ? 'Hide hand' : 'Peek at hand'}</button>` : ''}
       ${direct ? '<div class="direct-hint">▶ Click to attack directly</div>' : ''}
     </div>`;
   }
 
-  const handShown = pi => S.active === pi || S.peek[pi];
+  /** In a multiplayer match your side is at the bottom; otherwise Player 1 is. */
+  const bottomPi = () => MP.inMatch() ? MP.seat() : 0;
+  /** A hand shows face-down: the opponent's in a match, or (hot-seat) the hand of whoever isn't playing, unless peeked. */
+  const handHidden = pi => MP.inMatch() ? pi !== MP.seat() : S.active !== pi && !S.peek[pi];
+  /** Hot-seat folds the waiting player's hand away; in a match both hands stay, the opponent's face-down. */
+  const handShown = pi => MP.inMatch() || S.active === pi || S.peek[pi];
   let prevVis = null;   // hand visibility at the last render, [bool, bool]
 
   function handHTML(pi) {
     const p = P(pi);
-    const shown = handShown(pi);
+    const shown = !handHidden(pi);
     const hints = dropHints();
     const drop = hints && hints.pi === pi && hints.hand;
     const cards = p.hand.map(inst => miniFor(pi, inst, { faceDown: !shown, where: shown ? 'hand' : 'hand-hidden', extra: 'mini-hand' })).join('');
     // The opponent's hand folds away; render() starts from the previous state and flips it a frame later so it animates.
     const vis = prevVis ? prevVis[pi] : handShown(pi);
-    return `<div class="hand-wrap ${vis ? '' : 'collapsed'}" data-handwrap="${pi}"><div class="hand hand-${pi} ${drop ? 'drop-ok' : ''}" data-handzone="${pi}">
+    return `<div class="hand-wrap ${vis ? '' : 'collapsed'}" data-handwrap="${pi}"><div class="hand hand-${pi === bottomPi() ? 0 : 1} ${drop ? 'drop-ok' : ''}" data-handzone="${pi}">
       <div class="hand-label">${MC.esc(p.name)} · Hand ${p.hand.length}</div>
       <div class="hand-cards">${cards || '<span class="empty">Empty hand</span>'}</div></div></div>`;
   }
@@ -714,9 +726,16 @@
       title = `${P(S.active).name} · ${PHASES[S.phase]} Phase`;
       body = S.phase === 3 ? 'Select a monster and press Attack.' : 'Drag cards from your hand onto the table, or click a card for options.';
     }
+    if (MP.inMatch() && !m) {
+      const me = P(MP.seat()), them = P(opp(MP.seat()));
+      if (S.setup === 'field') {
+        body = me.field ? `Waiting for <b>${MC.esc(them.name)}</b> to choose a Field card…` : 'Choose your Field card to begin.';
+        if (!me.field) btns = '<button class="btn btn-hot btn-sm" data-mp-field>Choose Field card</button>';
+      } else if (S.active !== MP.seat()) body = `<b>${MC.esc(them.name)}</b> is playing. You can still flip your set cards and Barriers.`;
+    }
     return `<div class="box prompt ${hot ? 'box-hot' : ''}"><span class="box-tab">${MC.esc(title)}</span>
       <p>${body}</p><div class="prompt-btns">${btns}
-        <button class="btn btn-sm btn-hot" data-next ${S.mode || S.prompt ? 'disabled' : ''}>${S.phase === 4 ? 'End turn ▶' : 'Next phase ▶'}</button></div></div>`;
+        <button class="btn btn-sm btn-hot" data-next ${S.mode || S.prompt || S.setup || (MP.inMatch() && S.active !== MP.seat()) ? 'disabled' : ''}>${S.phase === 4 ? 'End turn ▶' : 'Next phase ▶'}</button></div></div>`;
   }
 
   function controlsHTML() {
@@ -759,7 +778,7 @@
   function dialogHTML() {
     const uid = S.hover ?? S.sel;
     const loc = uid != null && locate(uid);
-    const hidden = loc && loc.where === 'hand' && S.active !== loc.pi && !S.peek[loc.pi];
+    const hidden = loc && loc.where === 'hand' && handHidden(loc.pi);
     if (!loc || hidden) {
       return `<div class="dialog"><div class="box portrait"><span class="portrait-empty">?</span></div>
         <div class="dialog-main"><div class="box textbox"><span class="box-tab">Inspect</span>
@@ -790,41 +809,42 @@
     if (!S) return;
     MC.hideCardPop(); closeMenu();
     const wasLeft = root.querySelector('.hud')?.scrollTop;
+    const B = bottomPi(), T = opp(B), mine = MP.inMatch(), myTurn = !mine || S.active === MP.seat();
     root.innerHTML = `
       <div class="table-layout ${panelClasses()}">
         <div class="edge-zone edge-left" data-edge="left"></div><div class="edge-zone edge-right" data-edge="right"></div>
         <button class="panel-toggle pt-left" data-ptoggle="left" aria-label="Toggle left panel" title="Show / hide the left panel"><span>‹</span></button>
         <button class="panel-toggle pt-right" data-ptoggle="right" aria-label="Toggle right panel" title="Show / hide the right panel"><span>›</span></button>
         <aside class="hud panel panel-left">
-          ${plateHTML(1)}
+          ${plateHTML(T)}
           <div class="box turn"><span class="box-tab">Turn ${S.turn}</span>
             <ol class="phases">${PHASES.map((ph, i) => `<li class="${i === S.phase ? 'on' : i < S.phase ? 'done' : ''}">${ph}</li>`).join('')}</ol>
-            <button class="btn btn-hot btn-wide" data-next>${S.phase === 4 ? 'End turn ▶' : 'Next phase ▶'}</button>
+            <button class="btn btn-hot btn-wide" data-next ${myTurn && !S.setup ? '' : 'disabled'}>${!myTurn ? `${MC.esc(P(S.active).name)}'s turn` : S.phase === 4 ? 'End turn ▶' : 'Next phase ▶'}</button>
             <div class="turn-btns">
               <button class="btn btn-sm" data-draw>Draw</button>
-              <button class="btn btn-sm" data-newduel>New duel</button>
+              ${mine ? '<button class="btn btn-sm" data-mp-leave>Leave match</button>' : '<button class="btn btn-sm" data-newduel>New duel</button>'}
               <span class="sync" title="${MC.esc(Sync.hint())}">${Sync.label()}</span>
             </div>
           </div>
-          ${plateHTML(0)}
+          ${plateHTML(B)}
           <div class="box log"><span class="box-tab">Duel log</span>
             <ol>${S.log.map(l => `<li>${MC.esc(l)}</li>`).join('')}</ol></div>
         </aside>
         <div class="arena">
           ${promptHTML()}
-          ${handHTML(1)}
+          ${handHTML(T)}
           <div class="stage"><div class="fit"><div class="persp">
             <div class="table3d">
-              <div class="offcol off-left">${padHTML(1, 'field')}${padHTML(0, 'boss')}</div>
+              <div class="offcol off-left">${padHTML(T, 'field')}${padHTML(B, 'boss')}</div>
               <div class="mat">
-              ${sideHTML(1)}
+              ${sideHTML(T)}
               <div class="midline"><span class="mid-phase">${PHASES[S.phase]} Phase</span><span class="mid-vs">VS</span><span class="mid-turn">T${S.turn}</span></div>
-              ${sideHTML(0)}
+              ${sideHTML(B)}
               </div>
-              <div class="offcol off-right">${padHTML(1, 'boss')}${padHTML(0, 'field')}</div>
+              <div class="offcol off-right">${padHTML(T, 'boss')}${padHTML(B, 'field')}</div>
             </div>
           </div></div></div>
-          ${handHTML(0)}
+          ${handHTML(B)}
         </div>
         <aside class="dialog-slot panel panel-right">${dialogHTML()}</aside>
       </div>`;
@@ -837,6 +857,7 @@
     }
     prevVis = now;
     Sync.changed();
+    MP.afterRender();
     const stage = root.querySelector('.stage');
     stageRO.disconnect(); stageRO.observe(stage);
     fit();
@@ -1065,8 +1086,13 @@
     const btn = sel => t.closest(sel);
     let el;
 
-    if ((el = btn('[data-next]'))) { nextPhase(); render(); return; }
-    if ((el = btn('[data-draw]'))) { draw(P(S.active)); render(); return; }
+    if ((el = btn('[data-next]'))) {
+      if (MP.inMatch() && S.active !== MP.seat()) { MC.toast(`It's ${P(S.active).name}'s turn`); return; }
+      nextPhase(); render(); return;
+    }
+    if ((el = btn('[data-draw]'))) { draw(P(MP.inMatch() ? MP.seat() : S.active)); render(); return; }
+    if ((el = btn('[data-mp-leave]'))) { MP.leave(); return; }
+    if ((el = btn('[data-mp-field]'))) { MP.pickField(); return; }
     if ((el = btn('[data-newduel]'))) { newDuelDialog(); return; }
     if ((el = btn('[data-cancel]'))) { S.mode = null; render(); return; }
     if ((el = btn('[data-pay-ok]'))) { confirmPay(); render(); return; }
@@ -1122,7 +1148,7 @@
     const c = btn('[data-uid]');
     if (c) {
       const uid = +c.dataset.uid, loc = locate(uid);
-      if (loc.where === 'hand' && S.active !== loc.pi && !S.peek[loc.pi]) { MC.toast('Hidden hand — use Peek'); return; }
+      if (loc.where === 'hand' && handHidden(loc.pi)) { MC.toast('Hidden hand — use Peek'); return; }
       // Field and hand cards always (re)open their option buttons; other cards toggle selection
       const menuCard = ['hand', 'field', 'bar', 'rubble'].includes(loc.where);
       S.sel = S.sel === uid && !menuCard ? null : uid;
@@ -1138,16 +1164,20 @@
   // ───────────────────────── Shared table ─────────────────────────
   // The duel is saved to /api/table and every open Play Table polls it, so all players see the same board.
   // Only the game itself is shared (turn, piles, zones, LP, log); selection, hover, prompts and
-  // the Peek toggle stay on each screen.
+  // the Peek toggle stay on each screen. A multiplayer match uses its own room.
   const Sync = (() => {
-    const API = '/api/table', ROOM = new URLSearchParams(location.search).get('room') || 'main', POLL_MS = 2500;
-    let rev = 0, lastJSON = '', status = 'off', timer = null, pushing = false, polling = false;
+    const API = '/api/table', POLL_MS = 2500;
+    const DEFAULT_ROOM = new URLSearchParams(location.search).get('room') || 'main';
+    let room = DEFAULT_ROOM, rev = 0, lastJSON = '', status = 'off', timer = null, pushing = false, polling = false;
+    let ready = false;   // false until this room's table is loaded (or seeded): never push a stale board into it
+    let canSeed = true;  // may save our table when the room is empty
+    let started = false;
     const online = () => /^https?:$/.test(location.protocol);
 
     /** The shared part of the state as plain JSON (cards by id; Sets as arrays). */
     const snapshot = () => ({
       turn: S.turn, active: S.active, phase: S.phase, over: S.over, log: S.log, uidSeq,
-      players: S.players,
+      players: S.players, mp: S.mp || null, setup: S.setup || null,
     });
     const encode = () => JSON.stringify(snapshot(), (k, v) => k === 'card' ? undefined : v instanceof Set ? { $set: [...v] } : v);
 
@@ -1165,80 +1195,295 @@
       return missing ? null : raw;
     }
 
-    function setStatus(s) {
-      if (s === status) return;
-      status = s;
+    function setStatus(st) {
+      if (st === status) return;
+      status = st;
       const el = root?.querySelector('.sync');
       if (el) { el.textContent = label(); el.title = hint(); }
     }
-    const label = () => ({ live: '● Shared', saving: '● Saving…', off: '○ Local only' }[status]);
+    const label = () => ({ live: '● Shared', saving: '● Saving…', off: '○ Local only', wait: '○ Connecting…' }[status]);
     const hint = () => status === 'off'
       ? 'Not connected to the shared table. Changes stay on this device until the server can be reached.'
-      : 'This table is saved and shared with everyone who has the Play Table open.';
+      : 'This table is saved and shared with everyone in this room.';
 
     /** Replace the local table with the server's. */
     function adopt(state, newRev) {
       const next = decode(state);
       if (!next) return false;
       uidSeq = Math.max(uidSeq, next.uidSeq || 1);
-      S = { ...next, sel: null, hover: null, mode: null, prompt: null, peek: [false, false], drag: null };
-      rev = newRev;
+      const keepPeek = S?.peek || [false, false];
+      S = { ...next, sel: null, hover: null, mode: null, prompt: null, peek: keepPeek, drag: null };
+      rev = newRev; ready = true;
       lastJSON = encode();   // equals the server's, so rendering it doesn't echo a save
       MC.hideCardPop?.();
       render();
       return true;
     }
 
-    async function pull(initial) {
-      if (!online() || polling || document.hidden && !initial) return;
+    async function pull() {
+      if (!online() || polling || (document.hidden && ready)) return;
       if (drag?.started) return;             // don't pull the table out from under a drag
       polling = true;
+      const askedRoom = room;
       try {
-        const res = await fetch(`${API}?room=${ROOM}&rev=${rev}`, { cache: 'no-store' });
+        const res = await fetch(`${API}?room=${askedRoom}&rev=${ready ? rev : 0}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(res.status);
         const data = await res.json();
-        setStatus('live');
-        if (data.rev === 0 && rev === 0) { if (initial) await push(true); }       // nothing saved yet: save the table we have
-        else if (data.rev !== rev && data.state && (initial || encode() === lastJSON)) {          // someone else moved, nothing of ours pending
-          if (adopt(data.state, data.rev) && !initial) MC.toast('Table updated by another player');
-        }
+        if (askedRoom !== room) return;      // switched rooms while waiting
+        if (data.rev === 0) {
+          if (!ready && canSeed) { ready = true; await push(true); }   // empty room: save the table we have
+          else setStatus(ready ? 'live' : 'wait');
+        } else if (data.state && (!ready || (data.rev !== rev && encode() === lastJSON))) {
+          const first = !ready;
+          if (adopt(data.state, data.rev) && !first && !MP.inMatch()) MC.toast('Table updated by another player');
+          setStatus('live');
+        } else setStatus(ready ? 'live' : 'wait');
       } catch (e) { setStatus('off'); }
-      polling = false;
+      finally { polling = false; }
     }
 
     async function push(force) {
-      if (!online() || pushing || !S) return;
+      if (!online() || pushing || !S || !ready) return;
       const json = encode();
       if (!force && json === lastJSON) return;
       pushing = true; setStatus('saving');
+      const askedRoom = room;
       try {
         const res = await fetch(API, { method: 'PUT', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ room: ROOM, baseRev: rev, state: JSON.parse(json) }) });
+          body: JSON.stringify({ room: askedRoom, baseRev: rev, state: JSON.parse(json) }) });
+        if (askedRoom !== room) return;
         if (res.status === 409) {
           const cur = await res.json();       // someone saved first: theirs wins
-          if (cur.state && adopt(cur.state, cur.rev)) MC.toast('Another player moved first, so the table was updated');
+          if (cur.state && adopt(cur.state, cur.rev)) MC.toast('The other player moved at the same time, so the table was updated');
         } else if (res.ok) {
           const data = await res.json();
           rev = data.rev; lastJSON = json; setStatus('live');
         } else throw new Error(res.status);
       } catch (e) { setStatus('off'); }
-      pushing = false;
-      if (S && encode() !== lastJSON && status !== 'off') schedule();   // more changes landed while saving
+      finally { pushing = false; }
+      if (S && ready && encode() !== lastJSON && status !== 'off') schedule();   // more changes landed while saving
     }
 
     function schedule() { clearTimeout(timer); timer = setTimeout(() => push(), 350); }
 
     return {
       label, hint,
+      get room() { return room; },
+      get ready() { return ready; },
       /** Called after every render: save when the shared part of the table changed. */
-      changed() { if (online() && S && encode() !== lastJSON) schedule(); },
-      start() {
-        if (!online()) return;
-        pull(true);
+      changed() { if (online() && S && ready && encode() !== lastJSON) schedule(); },
+      /**
+       * Switch to another room. seed: our current table becomes the room's table right away
+       * (the multiplayer host); otherwise wait for the room's table and adopt it.
+       */
+      useRoom(next, { seed = false } = {}) {
+        clearTimeout(timer);
+        room = next || DEFAULT_ROOM; rev = 0; lastJSON = ''; ready = false; canSeed = seed || room === DEFAULT_ROOM;
+        setStatus('wait');
+        if (seed) { ready = true; push(true); } else pull();
+      },
+      defaultRoom: DEFAULT_ROOM,
+      start(firstRoom, opts) {
+        if (!online() || started) return;
+        started = true;
+        this.useRoom(firstRoom || DEFAULT_ROOM, opts);
         setInterval(() => pull(), POLL_MS);
         document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
       },
+      /** Poll right away (used while a match is starting). */
+      pullNow: () => pull(),
     };
+  })();
+
+
+  // ───────────────────────── Multiplayer ─────────────────────────
+  // Join the lobby with a name and a deck; when two players are waiting the server pairs them into a
+  // private room (/api/lobby). Seat 0 builds the duel there, both see a countdown, then each picks a
+  // Field card. In a match your side is at the bottom and you only see your own hand.
+  const MP = (() => {
+    const API = '/api/lobby';
+    const online = () => /^https?:$/.test(location.protocol);
+    const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    const set = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } };
+    let id = get('mc-player-id');
+    if (!id || !/^[a-z0-9]{6,40}$/.test(id)) {
+      id = (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)).replace(/[^a-z0-9]/g, '').slice(0, 20);
+      set('mc-player-id', id);
+    }
+    let lobbyTimer = null, countTimer = null, startsAt = 0, fieldOpen = false, flipQueued = false;
+    let pendingField = null;   // uid of the Field card we picked, re-applied if the other player's save landed first
+
+    const seat = () => S?.mp ? S.players.findIndex(p => p.playerId === id) : -1;
+    const inMatch = () => seat() >= 0;
+    const session = () => { try { return JSON.parse(get('mc-mp') || 'null'); } catch (e) { return null; } };
+    const post = body => fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, ...body }) })
+      .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || r.status); return d; });
+
+    function joinDialog() {
+      if (!online()) { MC.toast('Multiplayer needs the online site'); return; }
+      const decks = Object.entries(MC.DECKS).filter(([, d]) => MC.deckPlayable(d));
+      const lastDeck = get('mc-player-deck');
+      const box = MC.modal(`<div class="newduel mp-join">
+        <span class="eyebrow">Multiplayer</span><h2>Join the lobby</h2>
+        <label>Your name <input name="name" maxlength="24" placeholder="Your name" value="${MC.esc(get('mc-player-name') || '')}"></label>
+        <label>Your deck <select name="deck">${decks.map(([k, d]) => `<option value="${k}" ${k === lastDeck ? 'selected' : ''}>${MC.esc(d.name)}</option>`).join('')}</select></label>
+        <p class="note">When a second player joins, the duel starts after a short countdown. You only see your own hand.</p>
+        <button class="btn btn-hot" data-join>Join lobby</button></div>`);
+      const nameIn = box.querySelector('[name=name]');
+      nameIn.focus();
+      const go = () => {
+        const name = nameIn.value.trim();
+        if (!name) { MC.toast('Enter your name first'); nameIn.focus(); return; }
+        const key = box.querySelector('[name=deck]').value, d = MC.DECKS[key];
+        set('mc-player-name', name); set('mc-player-deck', key);
+        const deck = { name: d.name, boss: d.boss, barriers: d.barriers, field: d.field, main: d.main, extra: d.extra, side: [] };
+        lobby(name, deck);
+      };
+      box.querySelector('[data-join]').onclick = go;
+      nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    }
+
+    function lobby(name, deck) {
+      let matched = false;
+      const box = MC.modal(`<div class="mp-lobby"><span class="eyebrow">Multiplayer</span><h2>Lobby</h2>
+        <div class="mp-body"><p class="note">Joining…</p></div>
+        <button class="btn" data-leave>Leave lobby</button></div>`, {
+        onClose: () => {
+          clearInterval(lobbyTimer); lobbyTimer = null;
+          if (!matched) post({ op: 'leave' }).catch(() => {});
+        },
+      });
+      const body = box.querySelector('.mp-body');
+      box.querySelector('[data-leave]').onclick = () => MC.closeModal();
+      const tick = async () => {
+        try {
+          const data = await post({ op: 'join', name, deck });
+          if (matched || !lobbyTimer) return;
+          if (data.match) {
+            matched = true; clearInterval(lobbyTimer); lobbyTimer = null;
+            startMatch(data.match, data.now - Date.now(), box);
+            return;
+          }
+          const others = data.waiting.filter(w => w.name !== name || w.deckName !== deck.name);
+          body.innerHTML = `<div class="mp-wait"><span class="mp-spin"></span>Waiting for an opponent…</div>
+            <ul class="mp-list"><li><b>${MC.esc(name)}</b> · ${MC.esc(deck.name)} <small>(you)</small></li>
+            ${others.map(w => `<li><b>${MC.esc(w.name)}</b> · ${MC.esc(w.deckName)}</li>`).join('')}</ul>`;
+        } catch (e) {
+          body.innerHTML = `<p class="note">Can't reach the lobby (${MC.esc(e.message)}). Retrying…</p>`;
+        }
+      };
+      lobbyTimer = setInterval(tick, 1500);
+      tick();
+    }
+
+    /** Both players get here; seat 0 builds and saves the duel, seat 1 waits for it. */
+    function startMatch(match, offset, box) {
+      const mySeat = match.seats.findIndex(st => st.id === id);
+      if (mySeat < 0) return;
+      post({ op: 'leave' }).catch(() => {});   // done with the lobby: forget this match there so a later join starts fresh
+      const them = match.seats[1 - mySeat];
+      set('mc-mp', JSON.stringify({ room: match.room }));
+      startsAt = match.startAt - offset;   // the server's start time on this device's clock
+      if (mySeat === 0) {
+        newDuel(match.seats[0].deck, match.seats[1].deck, { names: match.seats.map(st => st.name), ids: match.seats.map(st => st.id) });
+        S.mp = { room: match.room };
+        S.setup = 'field';
+        log(`Multiplayer: ${match.seats[0].name} vs ${match.seats[1].name}. ${match.seats[0].name} goes first.`);
+        Sync.useRoom(match.room, { seed: true });
+        render();
+      } else Sync.useRoom(match.room);
+
+      box.innerHTML = `<div class="mp-lobby mp-found"><span class="eyebrow">Match found</span>
+        <h2>${MC.esc(match.seats[mySeat].name)} <span class="mp-vs">VS</span> ${MC.esc(them.name)}</h2>
+        <p class="note">${MC.esc(them.name)} is playing <b>${MC.esc(them.deck.name || '')}</b>. ${mySeat === 0 ? 'You go first.' : `${MC.esc(them.name)} goes first.`}</p>
+        <div class="mp-count">5</div></div>`;
+      const count = box.querySelector('.mp-count');
+      clearInterval(countTimer);
+      const step = () => {
+        const left = Math.ceil((startsAt - Date.now()) / 1000);
+        if (!Sync.ready) Sync.pullNow();
+        if (left > 0) { if (count.textContent !== String(left)) { count.textContent = left; count.classList.remove('pop'); void count.offsetWidth; count.classList.add('pop'); } return; }
+        if (!Sync.ready) { count.textContent = '…'; return; }   // still loading the duel
+        clearInterval(countTimer); countTimer = null;
+        MC.closeModal();
+        MC.toast('Duel start!');
+        render();
+      };
+      countTimer = setInterval(step, 200); step();
+    }
+
+    /** Pick your own Field card (face-down until both have chosen). */
+    function pickField() {
+      if (!inMatch() || fieldOpen) return;
+      const p = P(seat()), o = P(opp(seat()));
+      if (p.field) return;
+      fieldOpen = true;
+      const box = MC.modal(`<span class="eyebrow">${MC.esc(p.name)} · Field selection</span>
+        <h2>Choose your Field card</h2>
+        <p class="note">${MC.esc(o.name)} is playing <b>${MC.esc(o.deckName)}</b>. Your choice is placed face-down until both of you have picked.</p>
+        <div class="pick-grid">${p.fieldDeck.map(f => `<button class="card-cell" data-pick="${f.uid}">${MC.renderCard(f.card)}</button>`).join('')}</div>`,
+        { wide: true, onClose: () => { fieldOpen = false; } });
+      box.addEventListener('click', e => {
+        const b = e.target.closest('[data-pick]');
+        if (!b) return;
+        const me = P(seat());              // look it up again: the table may have synced since the dialog opened
+        const i = me.fieldDeck.findIndex(f => f.uid === +b.dataset.pick);
+        if (!me.field && i > -1) {
+          pendingField = +b.dataset.pick;
+          me.field = { inst: me.fieldDeck.splice(i, 1)[0], faceDown: true };
+          log(`${me.name} places a Field card face-down.`);
+        }
+        MC.closeModal(); render();
+      });
+    }
+
+    /** After each render: drive the Field-card setup once the countdown is over. */
+    function afterRender() {
+      if (!inMatch() || S.setup !== 'field' || Date.now() < startsAt || countTimer) return;
+      const me = P(seat());
+      // Our pick lost a save race (both players picked at once): put it back on the winning table.
+      const lost = !me.field && pendingField != null ? me.fieldDeck.findIndex(f => f.uid === pendingField) : -1;
+      if (lost > -1) {
+        me.field = { inst: me.fieldDeck.splice(lost, 1)[0], faceDown: true };
+        log(`${me.name} places a Field card face-down.`);
+        setTimeout(render, 0);
+        return;
+      }
+      if (!me.field && !fieldOpen && document.getElementById('modal').hidden) setTimeout(pickField, 0);
+      // Seat 0 starts the duel once both Field cards are down.
+      if (seat() === 0 && S.players.every(p => p.field) && !flipQueued) {
+        flipQueued = true;
+        setTimeout(() => {
+          flipQueued = false;
+          if (!inMatch() || S.setup !== 'field' || !S.players.every(p => p.field)) return;
+          S.players.forEach(p => { p.field.faceDown = false; });
+          S.setup = null; pendingField = null;
+          log('Both Field cards flip face-up.');
+          enterPhase();
+          render();
+        }, 0);
+      }
+    }
+
+    /** Back to the shared hot-seat table. */
+    function leave() {
+      set('mc-mp', null);
+      clearInterval(countTimer); countTimer = null;
+      demoBoard();
+      Sync.useRoom(Sync.defaultRoom);
+      render();
+      MC.toast('You left the match');
+    }
+
+    /** On page load: rejoin a match this browser was in. Gives up if the room has no table. */
+    function resume() {
+      const sess = session();
+      if (!sess?.room || !online()) return null;
+      setTimeout(() => { if (!Sync.ready && Sync.room === sess.room) { set('mc-mp', null); Sync.useRoom(Sync.defaultRoom); } }, 8000);
+      return sess.room;
+    }
+
+    return { seat, inMatch, joinDialog, pickField, afterRender, leave, resume };
   })();
 
   // ───────────────────────── Pop-up menus ─────────────────────────
@@ -1271,8 +1516,9 @@
 
   /** Clicking a Deck (any phase) offers Draw or View. */
   function openDeckMenu(pi, anchor) {
+    const theirs = MP.inMatch() && pi !== MP.seat();
     openMenu(anchor, [
-      { label: 'Draw', hot: true, run: () => { draw(P(pi)); render(); } },
+      ...(theirs ? [] : [{ label: 'Draw', hot: true, run: () => { draw(P(pi)); render(); } }]),
       { label: 'View', run: () => pileDialog(pi, 'deck') },
     ]);
   }
@@ -1340,14 +1586,14 @@
         if (uid != null && uid !== S.hover) { S.hover = uid; updateDialog(); }
         // same descriptive panel as the Deck Builder (never for a hidden hand)
         const mini = e.target.closest('.mini[data-uid]'), loc = mini && locate(+mini.dataset.uid);
-        if (!loc || (loc.where === 'hand' && S.active !== loc.pi && !S.peek[loc.pi])) { MC.hideCardPop(); return; }
+        if (!loc || (loc.where === 'hand' && handHidden(loc.pi))) { MC.hideCardPop(); return; }
         const live = loc.where === 'mon';
         MC.showCardPop(mini, loc.inst.card, live ? { atk: atk(loc.inst), def: def(loc.inst), charge: charge(loc.inst, loc.pi) } : {});
       });
       root.addEventListener('mouseleave', () => MC.hideCardPop());
       new ResizeObserver(() => fit()).observe(root);
       wirePanels(); applyPanels();
-      Sync.start();
+      Sync.start(MP.resume());
     },
     show() { requestAnimationFrame(fit); },
   };

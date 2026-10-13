@@ -47,11 +47,14 @@ export default async (req: Request) => {
     if (!ROOM_RE.test(room)) return bad("invalid room")
     if (!body.state || typeof body.state !== "object" || Array.isArray(body.state)) return bad("state must be an object")
     if (JSON.stringify(body.state).length > MAX_BYTES) return bad("table state is too large")
-    const prev = (await s.get(room, { type: "json" })) as Saved | null
+    // Compare-and-swap on the blob's ETag, so two saves on the same rev can't both succeed.
+    const cur = await s.getWithMetadata(room, { type: "json" })
+    const prev = (cur?.data as Saved | undefined) ?? null
     const rev = prev?.rev ?? 0
     if (Number(body.baseRev) !== rev) return json({ error: "conflict", ...prev }, 409)
     const next: Saved = { rev: rev + 1, updatedAt: Date.now(), state: body.state }
-    await s.setJSON(room, next)
+    const res = cur ? await s.setJSON(room, next, { onlyIfMatch: cur.etag }) : await s.setJSON(room, next, { onlyIfNew: true })
+    if (!res.modified) return json({ error: "conflict", ...((await s.get(room, { type: "json" })) as Saved | null) }, 409)
     return json({ ok: true, rev: next.rev, updatedAt: next.updatedAt })
   }
 

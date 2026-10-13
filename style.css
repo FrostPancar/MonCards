@@ -964,3 +964,21 @@ body.dark[data-view="index"] .db-tri .tri-me { stroke: #ebe8ff; }
 body[data-view="table"] #hover-toggle, body.builder-open #hover-toggle { display: block; }
 #hover-toggle.on { background: var(--yellow); }
 @media (min-width: 1000px) { .table-layout .dialog-slot { padding-bottom: 44px; } }
+
+/* ───────── multiplayer lobby ───────── */
+.newduel-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.mp-join label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; margin-bottom: 12px; }
+.mp-join input { font: inherit; font-size: 18px; padding: 6px 10px; border: 3px solid var(--ink); border-radius: 8px; }
+.mp-join input:focus { outline: 3px solid var(--blue); outline-offset: 1px; }
+.mp-wait { display: flex; align-items: center; gap: 10px; font-weight: 700; margin: 4px 0 10px; }
+.mp-spin { width: 16px; height: 16px; border: 3px solid var(--ink); border-right-color: transparent; border-radius: 50%; animation: mp-spin .8s linear infinite; }
+@keyframes mp-spin { to { transform: rotate(360deg); } }
+.mp-list { list-style: none; padding: 0; margin: 0 0 16px; }
+.mp-list li { padding: 6px 10px; border: 3px solid var(--ink); border-radius: 8px; margin-bottom: 6px; background: var(--paper-2); }
+.mp-list small { color: var(--ink-2); }
+.mp-found { text-align: center; }
+.mp-found h2 { font-size: 26px; }
+.mp-vs { color: var(--red); margin: 0 8px; }
+.mp-count { font: 700 84px/1 var(--f-num); color: var(--red); margin: 10px 0 6px; text-shadow: 4px 4px 0 var(--ink); }
+.mp-count.pop { animation: mp-pop .5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes mp-pop { from { transform: scale(1.8); opacity: .3; } }

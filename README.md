@@ -33,6 +33,19 @@ wins and the other screen updates to it. **New duel** starts a fresh shared tabl
 `?room=name` to the URL to use a separate table. The status chip in the Turn box shows **Shared** or
 **Local only** (opening `index.html` from disk has no server, so it stays local).
 
+## Multiplayer
+
+**New duel → ⚔ Multiplayer** asks for your name and a deck and puts you in the lobby (`/api/lobby`,
+`netlify/functions/lobby.mts`). As soon as two players are waiting they're paired into a private table
+room, seats are picked at random, and both screens count down from 5. Each player then picks a Field card
+face-down, both flip, and the first player's turn begins.
+
+In a match your side of the board is always at the bottom and you only see your own hand (the opponent's
+shows card backs). Only the turn player can advance phases. You can still act on the opponent's turn
+(flip set cards and Barriers, etc.). **Leave match** in the Turn box returns you to the shared hot-seat table.
+A refresh rejoins your match. Note: the opponent's hand is hidden on screen, but it is part of the
+saved table data, so this is not cheat-proof.
+
 ## Layout
 
 | Path | What |
@@ -40,6 +53,7 @@ wins and the other screen updates to it. **New duel** starts a fresh shared tabl
 | `data/cards.js` | Card database (`MC.CARDS`) and sample decks (`MC.DECKS`). Edit this to add cards. |
 | `src/core.js` | Card rendering, procedural pixel art, icons, deck validation |
 | `src/card-creator.js` | Card Creator form, shared card store client (cache, offline queue, sync) |
+| `netlify/functions/lobby.mts` | `/api/lobby`: multiplayer lobby and matchmaking |
 | `netlify/functions/table.mts` | `/api/table`: the shared Play Table state |
 | `netlify/functions/cards.mts` | `/api/cards`: shared custom cards and edits (Netlify Blobs) |
 | `src/deck-builder.js` | Deck Builder panel, deck stats and saved decks |
