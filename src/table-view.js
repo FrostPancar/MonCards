@@ -119,6 +119,9 @@
       if ((i = p.barriers.findIndex(b => b.rubble?.uid === uid)) > -1) return { pi, where: 'rubble', i, inst: p.barriers[i].rubble, slot: p.barriers[i] };
       if (p.field && p.field.inst.uid === uid) return { pi, where: 'field', inst: p.field.inst, slot: p.field };
       if (p.boss && p.boss.uid === uid) return { pi, where: 'boss', inst: p.boss };
+      for (const h of stackHosts(p)) {
+        if ((i = (h.under || []).findIndex(u => u.inst.uid === uid)) > -1) return { pi, where: 'under', i, inst: h.under[i].inst, slot: h };
+      }
       if ((i = p.gy.findIndex(x => x.uid === uid)) > -1) return { pi, where: 'gy', i, inst: p.gy[i] };
       if ((i = p.exgy.findIndex(x => x.uid === uid)) > -1) return { pi, where: 'exgy', i, inst: p.exgy[i] };
       if ((i = p.extra.findIndex(x => x.uid === uid)) > -1) return { pi, where: 'extra', i, inst: p.extra[i] };
@@ -130,13 +133,57 @@
 
   function reset(inst) { inst.mods = { atk: 0, def: 0, charge: 0 }; inst.infected = false; return inst; }
 
-  /** Take an instance out of wherever it is (hand, field, piles). */
+  // ───────────────────────── Stacks ─────────────────────────
+  // Any card can be dropped on top of an occupied Monster, Action, Barrier or Field zone. The zone's
+  // entry keeps the cards underneath in `under` ([{ inst, faceDown }], next card first).
+  const stackHosts = p => [...p.monsters, ...p.actions.filter(Boolean), ...p.barriers, ...(p.field ? [p.field] : [])];
+  /** The zone entry a located card sits on top of (null for hands and piles). */
+  function hostOf(loc) {
+    if (!loc) return null;
+    if (loc.where === 'mon') return P(loc.pi).monsters[loc.i];
+    return ['act', 'bar', 'field'].includes(loc.where) ? loc.slot : null;
+  }
+  /** Bring the next card of a stack to the top. False when there is nothing underneath. */
+  function promote(h) {
+    if (!h?.under?.length) return false;
+    const n = h.under.shift();
+    h.inst = n.inst;
+    if ('faceDown' in h) h.faceDown = !!n.faceDown;
+    return true;
+  }
+  function stackOn(loc, host) {
+    const p = P(loc.pi), inst = detach(loc);
+    (host.under ||= []).unshift({ inst: host.inst, faceDown: !!host.faceDown });
+    host.inst = inst;
+    if ('faceDown' in host) host.faceDown = false;
+    log(`${p.name} stacks ${inst.card.name} on top of ${host.under[0].inst.card.name}.`);
+    S.sel = null;
+  }
+  function stackTopToBottom(loc) {
+    const h = hostOf(loc);
+    if (!h?.under?.length) return;
+    h.under.push({ inst: h.inst, faceDown: !!h.faceDown });
+    promote(h);
+    log(`${loc.inst.card.name} goes to the bottom of its stack.`);
+    S.sel = null;
+  }
+  function stackTopToGY(loc) {
+    const inst = detach(loc);
+    bury(loc.pi, inst);
+    log(`${inst.card.name} goes from the top of its stack to the ${inst.card.kind === 'extra' ? 'Extra GY' : 'GY'}.`);
+    S.sel = null;
+  }
+
+  /** Take an instance out of wherever it is (hand, field, piles). A stack's next card moves up. */
   function detach(loc) {
     const p = P(loc.pi);
     switch (loc.where) {
       case 'hand': p.hand.splice(loc.i, 1); break;
-      case 'mon': p.monsters.splice(loc.i, 1); break;
-      case 'act': p.actions[loc.i] = null; break;
+      case 'mon': if (!promote(p.monsters[loc.i])) p.monsters.splice(loc.i, 1); break;
+      case 'act': if (!promote(p.actions[loc.i])) p.actions[loc.i] = null; break;
+      case 'field': if (!promote(p.field)) p.field = null; break;
+      case 'bar': promote(p.barriers[loc.i]); break;   // a Barrier Zone keeps its Barrier; only stacked cards leave
+      case 'under': loc.slot.under.splice(loc.i, 1); break;
       case 'gy': p.gy.splice(loc.i, 1); break;
       case 'exgy': p.exgy.splice(loc.i, 1); break;
       case 'extra': p.extra.splice(loc.i, 1); break;
@@ -206,6 +253,7 @@
     };
   }
 
+  /** LP lost when your monster is destroyed in battle: 500 for Basic (and Extra Deck), 1000 for Tribute and Boss. */
   function lpLossFor(inst) {
     if (inst.card.flags?.noBattleLpLoss) return 0;
     return ['tribute', 'boss'].includes(inst.card.kind) ? 1000 : 500;
@@ -267,7 +315,8 @@
   function payEligible(uid) {
     const m = S.mode, loc = locate(uid);
     if (!loc || loc.pi !== m.pi || uid === m.exclude) return false;
-    if (loc.where === 'mon') return !m.basicOnly || loc.inst.card.kind === 'basic';
+    // Tribute Summons: Basic and Extra Deck monsters, and any monster that currently has Charge
+    if (loc.where === 'mon') return !m.basicOnly || ['basic', 'extra'].includes(loc.inst.card.kind) || charge(loc.inst, m.pi, m.ctx) > 0;
     if (loc.where === 'hand') return !!m.allowHand;
     if (loc.where === 'rubble') return true; // Rubble can always be tributed for Charge
     return false;
@@ -300,7 +349,7 @@
     const c = loc.inst.card, p = P(loc.pi);
     if (c.kind === 'basic') return startPlace(loc.pi, loc.inst, 'mon', { slot });
     if (c.kind === 'tribute') {
-      if (S.turn === 1) { MC.toast('No Tribute summons on turn 1'); return; }
+      if (S.turn <= 2) { MC.toast('No Tribute Summons on your first turn'); return; }
       startPay(loc.pi, c.cost,
         { basicOnly: true, label: `Tribute Summon ${c.name}`, exclude: loc.inst.uid, ctx: { kind: 'tribute', insect: hasTag(c, 'Insect') } },
         () => startPlace(loc.pi, loc.inst, 'mon', { slot, note: `${p.name} Tribute Summons ${c.name}!` }));
@@ -548,14 +597,22 @@
   function dropHints() {
     const d = S.drag && locate(S.drag);
     if (!d) return null;
-    const c = d.inst.card, p = P(d.pi);
+    const c = d.inst.card, p = P(d.pi), self = d.inst.uid;
     const mainKind = ['basic', 'tribute', 'action'].includes(c.kind);
-    const h = { pi: d.pi, mon: new Set(), act: new Set(), gy: d.where !== 'boss' && c.kind !== 'extra', exgy: c.kind === 'extra', deck: mainKind, hand: d.where !== 'hand' && mainKind };
-    if (MC.isMonster(c) && (d.where !== 'hand' || ['basic', 'tribute'].includes(c.kind))) {
-      h.mon = cardZones(p, fp(c), d.inst.uid);
-    }
-    if (c.kind === 'action' && d.where === 'hand') p.actions.forEach((a, i) => { if (!a) h.act.add(i); });
+    const h = { pi: d.pi, mon: new Set(), act: new Set(), bar: new Set(), field: !(p.field && p.field.inst.uid === self),
+      gy: d.where !== 'boss' && c.kind !== 'extra', exgy: c.kind === 'extra', deck: mainKind, hand: d.where !== 'hand' && mainKind };
+    if (MC.isMonster(c) && (d.where !== 'hand' || ['basic', 'tribute'].includes(c.kind))) h.mon = cardZones(p, fp(c), self);
+    occupancy(p).forEach((o, i) => { if (o > -1 && p.monsters[o].inst.uid !== self) h.mon.add(i); });   // stack on a monster
+    p.actions.forEach((a, i) => { if (a ? a.inst.uid !== self : c.kind === 'action') h.act.add(i); });
+    p.barriers.forEach((bz, i) => { if (bz.inst.uid !== self) h.bar.add(i); });
     return h;
+  }
+
+  /** "+N" on a card that has cards stacked under it. */
+  function withStack(html, host) {
+    const n = host?.under?.length;
+    if (!n) return html;
+    return html.replace(/<\/div>\s*$/, `<span class="stack-n" title="${n} card${n > 1 ? 's' : ''} underneath">+${n}</span></div>`);
   }
 
   function miniFor(pi, inst, { faceDown = false, where = '', extra = '', back } = {}) {
@@ -569,7 +626,8 @@
     if (S.mode?.uid === inst.uid) cls.push('acting');
     if (S.drag === inst.uid) cls.push('drag-src');
     if (where === 'mon' && P(pi).attacked.has(inst.uid)) cls.push('spent');
-    if (['hand', 'mon', 'act', 'boss', 'rubble'].includes(where)) cls.push('draggable');
+    const host = where === 'bar' ? P(pi).barriers.find(b => b.inst === inst) : null;
+    if ((['hand', 'mon', 'act', 'boss', 'rubble', 'field'].includes(where) || (where === 'bar' && host?.under?.length)) && canDrag(pi)) cls.push('draggable');
     const live = MC.isMonster(inst.card) && where === 'mon' ? charge(inst, pi) : null;
     return MC.renderMini(inst.card, {
       faceDown, back, mods: inst.mods, infected: inst.infected,
@@ -590,7 +648,7 @@
     const layers = list.length ? Math.min(7, 1 + Math.ceil(list.length / 7)) : 0;
     const back = which === 'extra' ? 'extra' : 'main';
     const face = !list.length ? '' : faceUpTop
-      ? MC.renderMini(top.card, { extraClass: 'pile-top' })
+      ? MC.renderMini(top.card, { extraClass: `pile-top ${canDrag(pi) ? 'draggable' : ''}`, attrs: `data-uid="${top.uid}"` })
       : MC.renderMini(null, { faceDown: true, back, extraClass: 'pile-top' });
     return zone(`z-pile ${hint ? 'drop-ok' : ''}`, `data-pilezone="${which}" data-pi="${pi}" style="--layers:${layers}"`,
       `<div class="stack edge-${faceUpTop ? 'gy' : back}">${Array.from({ length: Math.max(0, layers - 1) }, (_, k) =>
@@ -618,21 +676,21 @@
       mrow += `<div class="zone z-mon ${cls}" style="grid-column:${col(i)}" data-mon="${i}" data-pi="${pi}">` +
         (blocked.has(i) ? '<span class="z-block" title="Blocked by a Footprint">🚫</span>' : `<span class="z-label">M${i + 1}</span>`) + '</div>';
     }
-    p.monsters.forEach(({ inst, at }) => {
-      const n = fp(inst.card);
-      mrow += `<div class="placed" style="grid-column:${col(at + cardOffset(n))}">${miniFor(pi, inst, { where: 'mon' })}</div>`;
+    p.monsters.forEach(entry => {
+      const { inst, at } = entry, n = fp(inst.card);
+      mrow += `<div class="placed" style="grid-column:${col(at + cardOffset(n))}">${withStack(miniFor(pi, inst, { where: 'mon', extra: entry.under?.length ? 'stacked' : '' }), entry)}</div>`;
     });
 
     const bar = i => {
       const b = p.barriers[i];
-      const under = miniFor(pi, b.inst, { faceDown: b.faceDown, where: 'bar', back: 'barrier', extra: b.rubble ? 'under-rubble' : '' });
+      const under = withStack(miniFor(pi, b.inst, { faceDown: b.faceDown, where: 'bar', back: 'barrier', extra: (b.rubble ? 'under-rubble ' : '') + (b.under?.length ? 'stacked' : '') }), b);
       const top = b.rubble ? miniFor(pi, b.rubble, { where: 'rubble', extra: 'rubble' }) : '';
-      return zone(`z-bar ${b.rubble ? 'has-rubble' : ''} ${isTarget(pi, 'bar', i) ? 'target' : ''}`, `data-bar="${i}" data-pi="${pi}"`, under + top, 'Barrier');
+      return zone(`z-bar ${b.rubble ? 'has-rubble' : ''} ${isTarget(pi, 'bar', i) ? 'target' : ''} ${myHints?.bar.has(i) ? 'drop-ok' : ''}`, `data-bar="${i}" data-pi="${pi}"`, under + top, 'Barrier');
     };
     const act = i => {
       const valid = placing && m.zone === 'act' && !p.actions[i];
       return zone(`z-act ${valid ? 'valid' : ''} ${myHints?.act.has(i) ? 'drop-ok' : ''}`, `data-act="${i}" data-pi="${pi}"`,
-        p.actions[i] ? miniFor(pi, p.actions[i].inst, { faceDown: p.actions[i].faceDown, where: 'act' }) : '', 'Action');
+        p.actions[i] ? withStack(miniFor(pi, p.actions[i].inst, { faceDown: p.actions[i].faceDown, where: 'act', extra: p.actions[i].under?.length ? 'stacked' : '' }), p.actions[i]) : '', 'Action');
     };
 
     // Extra Deck side (left for Player 1) and Deck side (right), each with its graveyard in front.
@@ -652,8 +710,8 @@
     const inner = which === 'boss'
       ? zone('z-boss', `data-bosszone data-pi="${pi}"`,
         p.boss ? miniFor(pi, p.boss, { where: 'boss' }) : MC.renderMini(null, { faceDown: true, back: 'boss', extraClass: 'boss-away' }), 'Boss')
-      : zone('z-field', `data-fieldzone data-pi="${pi}"`,
-        p.field ? miniFor(pi, p.field.inst, { faceDown: p.field.faceDown, where: 'field' }) : '', 'Field');
+      : zone(`z-field ${(h => h && h.pi === pi && h.field ? 'drop-ok' : '')(dropHints())}`, `data-fieldzone data-pi="${pi}"`,
+        p.field ? withStack(miniFor(pi, p.field.inst, { faceDown: p.field.faceDown, where: 'field', extra: p.field.under?.length ? 'stacked' : '' }), p.field) : '', 'Field');
     return `<div class="pad pad-${which} pad-p${pi}"><span class="pad-label">${which === 'boss' ? 'Boss' : 'Field'}</span>${inner}</div>`;
   }
 
@@ -682,6 +740,8 @@
   const handHidden = pi => MP.inMatch() ? pi !== MP.seat() : S.active !== pi && !S.peek[pi];
   /** Hot-seat folds the waiting player's hand away; in a match both hands stay, the opponent's face-down. */
   const handShown = pi => MP.inMatch() || S.active === pi || S.peek[pi];
+  /** In a match you only move your own cards. */
+  const canDrag = pi => !MP.inMatch() || pi === MP.seat();
   /** Cards you may not read: a hidden hand, and in a match the opponent's face-down Field and set Action cards. */
   const isSecret = loc => !!loc && ((loc.where === 'hand' && handHidden(loc.pi))
     || (MP.inMatch() && loc.pi !== MP.seat() && ['field', 'act'].includes(loc.where) && loc.slot?.faceDown));
@@ -708,8 +768,9 @@
       const total = paidSoFar();
       title = m.label;
       body = `Pay <b>${m.cost}</b> Charge — selected <b class="${total >= m.cost ? 'ok' : ''}">${total}</b>.
-        <small>${m.basicOnly ? 'Click Basic monsters or Rubble to tribute.' : 'Click monsters or Rubble to tribute, or hand cards to discard.'}</small>`;
+        <small>${m.basicOnly ? 'Click Basic or Extra Deck monsters (or any monster with Charge) or Rubble to tribute.' : 'Click monsters or Rubble to tribute, or hand cards to discard.'}</small>`;
       btns = `<button class="btn btn-hot btn-sm" data-pay-ok ${total >= m.cost ? '' : 'disabled'}>Confirm</button>
+        <button class="btn btn-sm" data-pay-free title="Skip the cost (apply it by hand)">Place free</button>
         <button class="btn btn-sm" data-cancel>Cancel</button>`;
     } else if (m?.type === 'place') {
       title = locate(m.uid).inst.card.name;
@@ -754,7 +815,7 @@
     } else if (loc.where === 'mon') {
       const why = canAttack(loc.pi, loc.inst);
       out.push(`<button class="btn btn-sm btn-hot" data-do="attack" ${why ? `disabled title="${MC.esc(why)}"` : ''}>Attack</button>`);
-      out.push(b('destroy', 'Destroy'), b('tribute', 'Tribute'));
+      out.push(b('destroy', 'Destroy'), b('destroy-battle', `Destroy (battle, −${lpLossFor(loc.inst)} LP)`), b('tribute', 'Tribute'));
       if (c.kind === 'basic' || c.kind === 'tribute') out.push(b('to-hand', 'To hand'));
       if (c.flags?.rubble) out.push(b('to-rubble', 'Make Rubble'));
       out.push(b('infect', loc.inst.infected ? 'Cure' : 'Infect'));
@@ -957,6 +1018,12 @@
         S.mode = { type: 'attack', pi: loc.pi, uid: inst.uid }; break;
       case 'destroy':
         removeMonster(loc.pi, inst.uid, 'is destroyed', true); break;
+      case 'destroy-battle': {     // a battle resolved by hand: its owner loses LP like an attack would
+        const loss = lpLossFor(inst);
+        removeMonster(loc.pi, inst.uid, 'is destroyed in battle', true);
+        loseLp(loc.pi, loss, `${c.name} destroyed`);
+        break;
+      }
       case 'tribute':
         removeMonster(loc.pi, inst.uid, 'is tributed'); break;
       case 'to-hand':
@@ -992,7 +1059,7 @@
   let drag = null, suppressClick = false;
 
   function onPointerDown(e) {
-    if (e.button !== 0 || S.mode) return;
+    if (e.button !== 0) return;
     const el = e.target.closest('.mini.draggable[data-uid]');
     if (!el) return;
     drag = { uid: +el.dataset.uid, x0: e.clientX, y0: e.clientY, el, started: false };
@@ -1003,7 +1070,8 @@
     if (!drag.started) {
       if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
       drag.started = true;
-      MC.hideCardPop();
+      MC.hideCardPop(); closeMenu();
+      S.mode = null; S.prompt = null;   // dragging always wins over a pending choice
       const ghost = document.createElement('div');
       ghost.className = 'drag-ghost';
       ghost.innerHTML = drag.el.outerHTML;
@@ -1034,37 +1102,69 @@
     if (!loc || !el) return;
     const c = loc.inst.card, p = P(loc.pi);
     const same = node => node && +node.dataset.pi === loc.pi;
-    const monZ = el.closest('[data-mon]'), actZ = el.closest('[data-act]');
+    const monZ = el.closest('[data-mon]'), actZ = el.closest('[data-act]'), barZ = el.closest('[data-bar]'), fieldZ = el.closest('[data-fieldzone]');
     const pileZ = el.closest('[data-pilezone]'), handZ = el.closest('[data-handzone]');
+    const isSelf = host => host && (host.inst.uid === uid || host.rubble?.uid === uid);
+
+    const onCard = el.closest('.mini[data-uid]');
+    if (onCard && !el.closest('[data-pilezone], [data-handzone]')) {
+      const tLoc = locate(+onCard.dataset.uid);
+      if (tLoc && +onCard.dataset.uid === uid) return;                    // dropped on itself
+      const host = tLoc?.where === 'rubble' ? P(tLoc.pi).barriers[tLoc.i] : hostOf(tLoc);
+      if (host && tLoc.pi === loc.pi && !isSelf(host)) { stackOn(loc, host); return; }
+    }
 
     if (monZ && same(monZ)) {
-      const slot = +monZ.dataset.mon;
-      if (loc.where === 'hand') { summonFromHand(loc, slot); return; }
+      const slot = +monZ.dataset.mon, o = occupancy(p)[slot], host = o > -1 ? p.monsters[o] : null;
+      if (host && !isSelf(host)) { stackOn(loc, host); return; }          // onto a monster: stack it
+      if (loc.where === 'hand') {
+        if (MC.isMonster(c)) summonFromHand(loc, slot); else MC.toast('Only monsters go in Monster Zones');
+        return;
+      }
       if (loc.where === 'boss') { startPlace(loc.pi, loc.inst, 'mon', { slot, note: `${p.name} summons their Boss, ${c.name}!` }); return; }
       if (loc.where === 'rubble') { startPlace(loc.pi, loc.inst, 'mon', { slot, note: `${p.name} Excavates ${c.name} from the Rubble!` }); return; }
       if (loc.where === 'mon') {
-        const s = startFor(p, fp(c), slot, uid);
-        if (s == null) { MC.toast('Not enough room there'); return; }
-        p.monsters[loc.i].at = s;
+        const st = startFor(p, fp(c), slot, uid);
+        if (st == null) { MC.toast('Not enough room there'); return; }
+        p.monsters[loc.i].at = st;
         return;
       }
+      if (MC.isMonster(c)) { startPlace(loc.pi, loc.inst, 'mon', { slot, note: `${p.name} places ${c.name} in a Monster Zone.` }); return; }
     }
-    if (actZ && same(actZ) && loc.where === 'hand' && c.kind === 'action') {
-      const slot = +actZ.dataset.act;
-      if (p.actions[slot]) { MC.toast('That Action Zone is taken'); return; }
-      S.prompt = {
-        title: c.name, text: 'Activate it now, or set it face-down?',
-        buttons: [
-          { label: `Activate (${c.cost})`, run: () => activateFromHand(locate(uid), slot) },
-          { label: 'Set', run: () => startPlace(loc.pi, locate(uid).inst, 'act', { faceDown: true, slot }) },
-          { label: 'Cancel', run: () => {} },
-        ],
-      };
+    if (actZ && same(actZ)) {
+      const slot = +actZ.dataset.act, host = p.actions[slot];
+      if (host && !isSelf(host)) { stackOn(loc, host); return; }
+      if (host) return;                                                    // dropped back where it was
+      if (loc.where === 'hand' && c.kind === 'action') {
+        S.prompt = {
+          title: c.name, text: 'Activate it now, or set it face-down?',
+          buttons: [
+            { label: `Activate (${c.cost})`, run: () => activateFromHand(locate(uid), slot) },
+            { label: 'Set', run: () => startPlace(loc.pi, locate(uid).inst, 'act', { faceDown: true, slot }) },
+            { label: 'Cancel', run: () => {} },
+          ],
+        };
+        return;
+      }
+      if (loc.where === 'act') { p.actions[slot] = p.actions[loc.i]; p.actions[loc.i] = null; return; }   // move it (with its stack)
+      p.actions[slot] = { inst: detach(loc), faceDown: false };
+      log(`${p.name} places ${c.name} in an Action Zone.`);
+      return;
+    }
+    if (barZ && same(barZ)) {
+      const host = p.barriers[+barZ.dataset.bar];
+      if (!isSelf(host)) stackOn(loc, host);
+      return;
+    }
+    if (fieldZ && same(fieldZ)) {
+      if (p.field && !isSelf(p.field)) { stackOn(loc, p.field); return; }
+      if (!p.field) { p.field = { inst: detach(loc), faceDown: false }; log(`${p.name} places ${c.name} in the Field Zone.`); }
       return;
     }
     if (pileZ && same(pileZ)) {
       const which = pileZ.dataset.pilezone;
       if ((which === 'gy' || which === 'exgy') && loc.where !== 'boss') {
+        if (loc.where === 'gy' || loc.where === 'exgy') return;
         if (loc.where === 'mon') { removeMonster(loc.pi, uid, 'is sent to the GY'); return; }
         bury(loc.pi, detach(loc)); log(`${c.name} is sent to the ${c.kind === 'extra' ? 'Extra GY' : 'GY'}.`); S.sel = null; return;
       }
@@ -1098,6 +1198,7 @@
     if ((el = btn('[data-newduel]'))) { newDuelDialog(); return; }
     if ((el = btn('[data-cancel]'))) { S.mode = null; render(); return; }
     if ((el = btn('[data-pay-ok]'))) { confirmPay(); render(); return; }
+    if ((el = btn('[data-pay-free]'))) { const m = S.mode; S.mode = null; log(`${P(m.pi).name} skips the Charge Cost (${m.label}).`); m.then(); render(); return; }
     if ((el = btn('[data-prompt]'))) { const p = S.prompt; S.prompt = null; p.buttons[+el.dataset.prompt].run(); render(); return; }
     if ((el = btn('[data-ptoggle]'))) {
       const side = el.dataset.ptoggle;
@@ -1152,12 +1253,16 @@
       const uid = +c.dataset.uid, loc = locate(uid);
       if (isSecret(loc)) { MC.toast(loc.where === 'hand' ? (MP.inMatch() ? "You can't see your opponent's hand" : 'Hidden hand — use Peek') : 'That card is face-down'); return; }
       // Field and hand cards always (re)open their option buttons; other cards toggle selection
-      const menuCard = ['hand', 'field', 'bar', 'rubble'].includes(loc.where);
+      const stack = hostOf(loc)?.under?.length ? [
+        { label: 'Top card → bottom', run: () => { stackTopToBottom(locate(uid)); render(); } },
+        { label: 'Top card → GY', hot: true, run: () => { stackTopToGY(locate(uid)); render(); } },
+      ] : [];
+      const menuCard = stack.length > 0 || ['hand', 'field', 'bar', 'rubble'].includes(loc.where);
       S.sel = S.sel === uid && !menuCard ? null : uid;
       render();
       if (menuCard) {
-        openMenu(root.querySelector(`.mini[data-uid="${uid}"]`),
-          loc.where === 'hand' ? handMenu(loc) : loc.where === 'field' ? fieldMenu(loc) : barrierMenu(loc), loc.where === 'hand' ? 'above' : 'side');
+        const own = loc.where === 'hand' ? handMenu(loc) : loc.where === 'field' ? fieldMenu(loc) : ['bar', 'rubble'].includes(loc.where) ? barrierMenu(loc) : [];
+        openMenu(root.querySelector(`.mini[data-uid="${uid}"]`), [...stack, ...own], loc.where === 'hand' ? 'above' : 'side');
       }
     }
   }

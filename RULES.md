@@ -104,11 +104,9 @@ through effects that can be used in the Battle Phase.
 
 ### First-turn restrictions
 
-- Player 1 does **not draw** on their first turn and **cannot attack**.
-- On **turn 1** **neither player can summon Tribute
-  or Extra Deck monsters**.
-- 🔶 **Open question:** does "turn 1" mean only the first turn of the duel, or each
-  player's first turn? *The mockup table applies it to the first turn of the duel only.*
+- Player 1 **skips the Draw Phase** of their first turn (it starts in the Standby Phase) and **cannot attack**.
+- Neither player can **Tribute Summon** on **their own first turn** (turn 1 for Player 1, turn 2 for
+  Player 2). *The mockup table enforces this for Tribute Summons; Extra Deck summons are applied by hand.*
 
 ---
 

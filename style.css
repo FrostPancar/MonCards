@@ -982,3 +982,11 @@ body[data-view="table"] #hover-toggle, body.builder-open #hover-toggle { display
 .mp-count { font: 700 84px/1 var(--f-num); color: var(--red); margin: 10px 0 6px; text-shadow: 4px 4px 0 var(--ink); }
 .mp-count.pop { animation: mp-pop .5s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes mp-pop { from { transform: scale(1.8); opacity: .3; } }
+
+/* stacked cards: offset card edges behind the top card, and a "+N" count */
+.mini.stacked { box-shadow: 0 0 0 3px var(--edge), 0 6px 0 3px var(--edge), 6px -6px 0 0 #fff, 6px -6px 0 3px var(--ink), 11px -11px 0 0 #fff, 11px -11px 0 3px var(--ink); }
+.stack-n {
+  position: absolute; top: -11px; left: -11px; z-index: 4; pointer-events: none;
+  font: 700 12px/1 var(--f-body); color: var(--ink); background: var(--yellow);
+  border: 2px solid var(--ink); border-radius: 6px; padding: 2px 4px;
+}
