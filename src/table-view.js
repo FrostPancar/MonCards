@@ -388,11 +388,10 @@
   // ───────────────────────── Phases ─────────────────────────
   function enterPhase() {
     const p = P(S.active);
+    // The first player skips the Draw Phase of the first turn and starts in the Standby Phase.
+    if (S.phase === 0 && S.turn === 1) { log(`${p.name} goes first and skips the Draw Phase.`); S.phase = 1; }
     log(`— ${p.name}: ${PHASES[S.phase]} Phase —`);
-    if (S.phase === 0) {
-      if (S.turn === 1) log(`${p.name} does not draw on the first turn.`);
-      else draw(p);
-    }
+    if (S.phase === 0) draw(p);
   }
   function nextPhase() {
     S.mode = null;
@@ -683,6 +682,9 @@
   const handHidden = pi => MP.inMatch() ? pi !== MP.seat() : S.active !== pi && !S.peek[pi];
   /** Hot-seat folds the waiting player's hand away; in a match both hands stay, the opponent's face-down. */
   const handShown = pi => MP.inMatch() || S.active === pi || S.peek[pi];
+  /** Cards you may not read: a hidden hand, and in a match the opponent's face-down Field and set Action cards. */
+  const isSecret = loc => !!loc && ((loc.where === 'hand' && handHidden(loc.pi))
+    || (MP.inMatch() && loc.pi !== MP.seat() && ['field', 'act'].includes(loc.where) && loc.slot?.faceDown));
   let prevVis = null;   // hand visibility at the last render, [bool, bool]
 
   function handHTML(pi) {
@@ -778,7 +780,7 @@
   function dialogHTML() {
     const uid = S.hover ?? S.sel;
     const loc = uid != null && locate(uid);
-    const hidden = loc && loc.where === 'hand' && handHidden(loc.pi);
+    const hidden = isSecret(loc);
     if (!loc || hidden) {
       return `<div class="dialog"><div class="box portrait"><span class="portrait-empty">?</span></div>
         <div class="dialog-main"><div class="box textbox"><span class="box-tab">Inspect</span>
@@ -1148,7 +1150,7 @@
     const c = btn('[data-uid]');
     if (c) {
       const uid = +c.dataset.uid, loc = locate(uid);
-      if (loc.where === 'hand' && handHidden(loc.pi)) { MC.toast('Hidden hand — use Peek'); return; }
+      if (isSecret(loc)) { MC.toast(loc.where === 'hand' ? (MP.inMatch() ? "You can't see your opponent's hand" : 'Hidden hand — use Peek') : 'That card is face-down'); return; }
       // Field and hand cards always (re)open their option buttons; other cards toggle selection
       const menuCard = ['hand', 'field', 'bar', 'rubble'].includes(loc.where);
       S.sel = S.sel === uid && !menuCard ? null : uid;
@@ -1586,7 +1588,7 @@
         if (uid != null && uid !== S.hover) { S.hover = uid; updateDialog(); }
         // same descriptive panel as the Deck Builder (never for a hidden hand)
         const mini = e.target.closest('.mini[data-uid]'), loc = mini && locate(+mini.dataset.uid);
-        if (!loc || (loc.where === 'hand' && handHidden(loc.pi))) { MC.hideCardPop(); return; }
+        if (!loc || isSecret(loc)) { MC.hideCardPop(); return; }
         const live = loc.where === 'mon';
         MC.showCardPop(mini, loc.inst.card, live ? { atk: atk(loc.inst), def: def(loc.inst), charge: charge(loc.inst, loc.pi) } : {});
       });
